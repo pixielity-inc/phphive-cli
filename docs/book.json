@@ -1,0 +1,60 @@
+{
+  "root": "./",
+  "title": "PhpHive CLI Documentation",
+  "description": "Comprehensive documentation for PhpHive CLI - PHP Monorepo Management powered by Turborepo",
+  "author": "PhpHive Team",
+  "language": "en",
+  "gitbook": ">=3.2.0",
+  "structure": {
+    "readme": "README.md",
+    "summary": "SUMMARY.md"
+  },
+  "plugins": [
+    "github",
+    "edit-link",
+    "prism",
+    "-highlight",
+    "copy-code-button",
+    "expandable-chapters-small",
+    "anchors",
+    "search-plus",
+    "-search",
+    "-lunr",
+    "theme-comscore"
+  ],
+  "pluginsConfig": {
+    "github": {
+      "url": "https://github.com/pixielity-co/phphive-cli"
+    },
+    "edit-link": {
+      "base": "https://github.com/pixielity-co/phphive-cli/edit/main/docs",
+      "label": "Edit This Page"
+    },
+    "prism": {
+      "css": [
+        "prism-themes/themes/prism-ghcolors.css"
+      ],
+      "lang": {
+        "shell": "bash"
+      }
+    },
+    "theme-default": {
+      "showLevel": true,
+      "styles": {
+        "website": "styles/website.css"
+      }
+    }
+  },
+  "links": {
+    "sidebar": {
+      "GitHub": "https://github.com/pixielity-co/phphive-cli",
+      "Packagist": "https://packagist.org/packages/phphive/cli",
+      "Issues": "https://github.com/pixielity-co/phphive-cli/issues"
+    }
+  },
+  "variables": {
+    "version": "1.0.0",
+    "packageName": "phphive/cli",
+    "binaryName": "hive"
+  }
+}
