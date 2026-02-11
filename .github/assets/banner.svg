@@ -1,14 +1,21 @@
-<svg width="1200" height="400" xmlns="http://www.w3.org/2000/svg">
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
   <defs>
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f39c12;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#e74c3c;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#9b59b6;stop-opacity:1" />
-    </linearGradient>
+
+    <!-- Honeycomb pattern -->
+    <pattern id="honeycomb" x="0" y="0" width="60" height="52" patternUnits="userSpaceOnUse">
+      <path d="M30,0 L45,13 L45,39 L30,52 L15,39 L15,13 Z"
+            fill="none"
+            stroke="#F39C12"
+            stroke-width="0.5"
+            opacity="0.15"/>
+    </pattern>
+
+    <!-- Glow effect -->
     <filter id="glow">
       <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
       <feMerge>
@@ -16,68 +23,79 @@
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <pattern id="hexPattern" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
-      <path d="M30 0 L45 15 L45 45 L30 60 L15 45 L15 15 Z" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
-    </pattern>
   </defs>
 
   <!-- Background -->
-  <rect width="1200" height="400" fill="url(#bgGradient)"/>
-  <rect width="1200" height="400" fill="url(#hexPattern)"/>
+  <rect width="1200" height="300" fill="url(#bgGradient)"/>
+  <rect width="1200" height="300" fill="url(#honeycomb)"/>
 
-  <!-- Honeycomb decoration left -->
-  <g opacity="0.1">
-    <path d="M50 100 L80 120 L80 160 L50 180 L20 160 L20 120 Z" fill="none" stroke="#f39c12" stroke-width="2"/>
-    <path d="M80 160 L110 180 L110 220 L80 240 L50 220 L50 180 Z" fill="none" stroke="#e74c3c" stroke-width="2"/>
-    <path d="M110 100 L140 120 L140 160 L110 180 L80 160 L80 120 Z" fill="none" stroke="#9b59b6" stroke-width="2"/>
+  <!-- Decorative hexagons -->
+  <g opacity="0.3">
+    <path d="M100,50 L130,70 L130,110 L100,130 L70,110 L70,70 Z" fill="none" stroke="#F39C12" stroke-width="2"/>
+    <path d="M1100,170 L1130,190 L1130,230 L1100,250 L1070,230 L1070,190 Z" fill="none" stroke="#F39C12" stroke-width="2"/>
   </g>
 
-  <!-- Honeycomb decoration right -->
-  <g opacity="0.1">
-    <path d="M1150 100 L1180 120 L1180 160 L1150 180 L1120 160 L1120 120 Z" fill="none" stroke="#f39c12" stroke-width="2"/>
-    <path d="M1120 160 L1150 180 L1150 220 L1120 240 L1090 220 L1090 180 Z" fill="none" stroke="#e74c3c" stroke-width="2"/>
-    <path d="M1090 100 L1120 120 L1120 160 L1090 180 L1060 160 L1060 120 Z" fill="none" stroke="#9b59b6" stroke-width="2"/>
+  <!-- Bee icon -->
+  <g transform="translate(200, 100)">
+    <!-- Bee body -->
+    <ellipse cx="0" cy="0" rx="25" ry="35" fill="#F39C12" filter="url(#glow)"/>
+    <ellipse cx="0" cy="-10" rx="20" ry="15" fill="#FFB84D"/>
+    <ellipse cx="0" cy="10" rx="20" ry="15" fill="#E67E22"/>
+
+    <!-- Bee stripes -->
+    <rect x="-20" y="-5" width="40" height="3" fill="#1a1a2e" opacity="0.6"/>
+    <rect x="-20" y="5" width="40" height="3" fill="#1a1a2e" opacity="0.6"/>
+
+    <!-- Bee wings -->
+    <ellipse cx="-15" cy="-15" rx="18" ry="25" fill="#ECF0F1" opacity="0.7" transform="rotate(-30 -15 -15)"/>
+    <ellipse cx="15" cy="-15" rx="18" ry="25" fill="#ECF0F1" opacity="0.7" transform="rotate(30 15 -15)"/>
+
+    <!-- Bee head -->
+    <circle cx="0" cy="-30" r="12" fill="#F39C12"/>
+    <circle cx="-5" cy="-32" r="3" fill="#1a1a2e"/>
+    <circle cx="5" cy="-32" r="3" fill="#1a1a2e"/>
+
+    <!-- Antennae -->
+    <line x1="-5" y1="-40" x2="-8" y2="-48" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="5" y1="-40" x2="8" y2="-48" stroke="#1a1a2e" stroke-width="2"/>
+    <circle cx="-8" cy="-48" r="2" fill="#F39C12"/>
+    <circle cx="8" cy="-48" r="2" fill="#F39C12"/>
   </g>
 
-  <!-- Main Title -->
-  <text x="600" y="160" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="96" font-weight="900" text-anchor="middle" fill="url(#textGradient)" filter="url(#glow)">
+  <!-- Main title -->
+  <text x="300" y="130" font-family="'Segoe UI', Arial, sans-serif" font-size="72" font-weight="bold" fill="#ECF0F1">
     PhpHive
   </text>
 
-  <!-- Subtitle -->
-  <text x="600" y="210" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="300" text-anchor="middle" fill="#ecf0f1" opacity="0.9">
+  <!-- CLI text -->
+  <text x="300" y="180" font-family="'Courier New', monospace" font-size="48" font-weight="normal" fill="#F39C12">
+    CLI
+  </text>
+
+  <!-- Tagline -->
+  <text x="300" y="220" font-family="'Segoe UI', Arial, sans-serif" font-size="24" font-weight="300" fill="#BDC3C7">
     PHP Monorepo Management powered by Turborepo
   </text>
 
-  <!-- Feature badges -->
-  <g transform="translate(300, 260)">
-    <!-- Badge 1 -->
-    <rect x="0" y="0" width="180" height="40" rx="20" fill="rgba(243, 156, 18, 0.2)" stroke="#f39c12" stroke-width="2"/>
-    <text x="90" y="26" font-family="'SF Mono', 'Monaco', 'Courier New', monospace" font-size="14" font-weight="600" text-anchor="middle" fill="#f39c12">
-      🚀 Multi-Framework
-    </text>
-
-    <!-- Badge 2 -->
-    <rect x="200" y="0" width="160" height="40" rx="20" fill="rgba(231, 76, 60, 0.2)" stroke="#e74c3c" stroke-width="2"/>
-    <text x="280" y="26" font-family="'SF Mono', 'Monaco', 'Courier New', monospace" font-size="14" font-weight="600" text-anchor="middle" fill="#e74c3c">
-      ⚡ Turbo Speed
-    </text>
-
-    <!-- Badge 3 -->
-    <rect x="380" y="0" width="180" height="40" rx="20" fill="rgba(155, 89, 182, 0.2)" stroke="#9b59b6" stroke-width="2"/>
-    <text x="470" y="26" font-family="'SF Mono', 'Monaco', 'Courier New', monospace" font-size="14" font-weight="600" text-anchor="middle" fill="#9b59b6">
-      🎯 Quality Tools
+  <!-- Version badge -->
+  <g transform="translate(950, 100)">
+    <rect x="0" y="0" width="200" height="40" rx="20" fill="#F39C12" opacity="0.2"/>
+    <rect x="0" y="0" width="200" height="40" rx="20" fill="none" stroke="#F39C12" stroke-width="2"/>
+    <text x="100" y="27" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="#F39C12" text-anchor="middle">
+      v1.0.4
     </text>
   </g>
 
-  <!-- Bottom decoration line -->
-  <line x1="200" y1="350" x2="1000" y2="350" stroke="url(#textGradient)" stroke-width="2" opacity="0.3"/>
-
-  <!-- Version badge -->
-  <g transform="translate(1050, 350)">
-    <rect x="0" y="0" width="100" height="30" rx="15" fill="rgba(46, 204, 113, 0.2)" stroke="#2ecc71" stroke-width="1.5"/>
-    <text x="50" y="20" font-family="'SF Mono', 'Monaco', 'Courier New', monospace" font-size="12" font-weight="600" text-anchor="middle" fill="#2ecc71">
-      v1.0.2
+  <!-- Feature badges -->
+  <g transform="translate(950, 160)">
+    <text x="0" y="0" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#BDC3C7">
+      ⚡ Turborepo
+    </text>
+    <text x="0" y="25" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#BDC3C7">
+      🐝 Multi-Framework
+    </text>
+    <text x="0" y="50" font-family="'Segoe UI', Arial, sans-serif" font-size="14" fill="#BDC3C7">
+      💎 Quality Built-in
     </text>
   </g>
 </svg>

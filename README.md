@@ -6,11 +6,12 @@
 
 **🐝 PHP Monorepo Management powered by Turborepo**
 
-[![PHP Version](https://img.shields.io/badge/PHP-8.3%2B-777BB4?style=flat-square&logo=php)](https://www.php.net/)
-[![Packagist Version](https://img.shields.io/packagist/v/phphive/cli?style=flat-square)](https://packagist.org/packages/phphive/cli)
+[![PHP Version](https://img.shields.io/badge/PHP-8.4%2B-777BB4?style=flat-square&logo=php&logoColor=white)](https://www.php.net/)
+[![Packagist Version](https://img.shields.io/packagist/v/phphive/cli?style=flat-square&logo=packagist&logoColor=white)](https://packagist.org/packages/phphive/cli)
+[![Downloads](https://img.shields.io/packagist/dt/phphive/cli?style=flat-square&logo=packagist&logoColor=white&label=downloads)](https://packagist.org/packages/phphive/cli)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Downloads](https://img.shields.io/packagist/dt/phphive/cli?style=flat-square)](https://packagist.org/packages/phphive/cli)
-[![Tests](https://img.shields.io/badge/tests-58%20passing-success?style=flat-square)](https://github.com/pixielity-co/phphive-cli/actions)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/pixielity-co/phphive-cli/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/pixielity-co/phphive-cli/actions)
+[![Tests](https://img.shields.io/badge/tests-58%20passing-success?style=flat-square&logo=phpunit&logoColor=white)](https://github.com/pixielity-co/phphive-cli/actions)
 
 [Features](#-features) •
 [Installation](#-installation) •
