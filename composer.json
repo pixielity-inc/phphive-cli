@@ -36,14 +36,14 @@
         "illuminate/container": "^11.0"
     },
     "require-dev": {
-        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan": "^2.1",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/extension-installer": "^1.4",
         "laravel/pint": "^1.18",
         "rector/rector": "^2.0",
         "phpunit/phpunit": "^11.5",
         "mockery/mockery": "^1.6",
-        "infection/infection": "^0.29"
+        "infection/infection": "^0.32"
     },
     "autoload": {
         "psr-4": {
