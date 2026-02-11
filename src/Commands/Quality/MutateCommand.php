@@ -150,10 +150,13 @@ final class MutateCommand extends BaseCommand
         $root = $this->getMonorepoRoot();
 
         // Extract options from user input
-        $minMsi = $input->getOption('min-msi');
-        $minCoveredMsi = $input->getOption('min-covered-msi');
-        $threads = $input->getOption('threads');
-        $showMutations = $input->getOption('show-mutations');
+        $minMsiOption = $input->getOption('min-msi');
+        $minCoveredMsiOption = $input->getOption('min-covered-msi');
+        $threadsOption = $input->getOption('threads');
+        $minMsi = is_string($minMsiOption) ? $minMsiOption : '80';
+        $minCoveredMsi = is_string($minCoveredMsiOption) ? $minCoveredMsiOption : '85';
+        $threads = is_string($threadsOption) ? $threadsOption : '4';
+        $showMutations = $this->hasOption('show-mutations');
 
         // Build Infection command with required options
         // --threads: Number of parallel processes

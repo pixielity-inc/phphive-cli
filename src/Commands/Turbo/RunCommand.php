@@ -204,31 +204,32 @@ final class RunCommand extends BaseCommand
 
         // Filter to specific workspace if requested
         // This limits execution to a single app or package
-        if ($workspace = $input->getOption('workspace')) {
+        $workspace = $input->getOption('workspace');
+        if (! in_array($workspace, [null, false, ''], true)) {
             $options['filter'] = $workspace;
         }
 
         // Force execution (bypass cache)
         // Useful when you need to ensure task runs regardless of cache state
-        if ($input->getOption('force')) {
+        if ($input->getOption('force') === true) {
             $options['force'] = true;
         }
 
         // Disable caching entirely
         // Different from force - this prevents cache writes too
-        if ($input->getOption('no-cache')) {
+        if ($input->getOption('no-cache') === true) {
             $options['cache'] = false;
         }
 
         // Enable parallel execution
         // Forces parallel mode even for tasks that might run sequentially
-        if ($input->getOption('parallel')) {
+        if ($input->getOption('parallel') === true) {
             $options['parallel'] = true;
         }
 
         // Continue on error
         // Don't stop on first failure - run all tasks
-        if ($input->getOption('continue')) {
+        if ($input->getOption('continue') === true) {
             $options['continue'] = true;
         }
 

@@ -29,7 +29,6 @@ use InvalidArgumentException;
 
 use function is_object;
 use function is_string;
-use function min;
 use function preg_match;
 use function preg_replace;
 
@@ -278,7 +277,7 @@ final class Reflection extends BaseReflector
         $class = Str::replace('\\', '/', $class);
 
         // Get the basename by extracting the last part after the last slash
-        $basename = basename($class);
+        $basename = is_string($class) ? basename($class) : '';
 
         // If a string to remove is provided, check for prefix and suffix removal
         if ($stringToRemove !== null) {
@@ -288,8 +287,9 @@ final class Reflection extends BaseReflector
             }
 
             // Check if the basename ends with the string to remove
-            if (Str::substr($basename, -Str::length($stringToRemove)) === $stringToRemove) {
-                $basename = Str::substr($basename, 0, -Str::length($stringToRemove));
+            $stringLength = Str::length($stringToRemove);
+            if ($stringLength > 0 && Str::substr($basename, -$stringLength) === $stringToRemove) {
+                $basename = Str::substr($basename, 0, -$stringLength);
             }
         }
 
@@ -328,18 +328,20 @@ final class Reflection extends BaseReflector
         $class_name = '';
 
         // Find the namespace
-
-        if (preg_match($namespace_pattern, $file_contents, $matches)) {
+        $namespace = '';
+        $matchResult = preg_match($namespace_pattern, $file_contents, $matches);
+        if ($matchResult === 1) {
             $namespace = Str::trim($matches[1]);
         }
 
-        if ($namespace === '' || $namespace === '0') {
+        if ($namespace === '') {
             return null;
         }
 
         // Find the class name
-
-        if (preg_match($class_pattern, $file_contents, $matches)) {
+        $class_name = '';
+        $matchResult = preg_match($class_pattern, $file_contents, $matches);
+        if ($matchResult === 1) {
             $class_name = Str::trim($matches[1]);
         }
 
@@ -642,7 +644,8 @@ final class Reflection extends BaseReflector
         $namespaceParts = explode('\\', $fullNamespace);
 
         // Ensure levels is not greater than the number of available namespace levels.
-        $levels = min($levels, count($namespaceParts));
+        $levelsCount = count($namespaceParts);
+        $levels = $levels > $levelsCount ? $levelsCount : $levels;
 
         // Return the namespace up to the specified number of levels.
         return implode('\\', Arr::slice($namespaceParts, 0, $levels));
@@ -814,7 +817,6 @@ final class Reflection extends BaseReflector
         $traits = self::getTraitNames($className);
 
         // Check if the current class has the specified trait
-
         if (in_array($trait, $traits, true)) {
             return true;
         }
@@ -1165,7 +1167,7 @@ final class Reflection extends BaseReflector
 
         // Check if the class is an interceptor and remove the 'Interceptor' suffix if necessary
         if (Str::endsWith($className, 'Interceptor')) {
-            $result = Str::replaceLast('\Interceptor', '', $className);
+            $result = Str::replaceLast('Interceptor', '', $className);
             $className = is_string($result) ? $result : $className;
         }
 

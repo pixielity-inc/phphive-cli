@@ -1,0 +1,70 @@
+Application (MonoPhp\Cli\Tests\Unit\Application)
+ [x] Can create application instance
+ [x] Make creates and boots application
+ [x] Container returns container instance
+ [x] Boot discovers commands
+ [x] Has default command
+ [x] Get long version returns formatted string
+
+Arr (MonoPhp\Cli\Tests\Unit\Support\Arr)
+ [x] Build transforms array with callback
+ [x] Keys returns array keys
+ [x] Values returns array values
+ [x] Flip swaps keys and values
+ [x] Combine creates array from keys and values
+ [x] Key exists checks for key
+ [x] Unique removes duplicates
+ [x] Diff returns difference
+ [x] Intersect returns intersection
+ [x] Merge combines arrays
+ [x] Chunk splits array
+ [x] Filter removes elements
+ [x] In array checks value existence
+ [x] Sum calculates total
+ [x] Product calculates product
+ [x] Count returns element count
+
+Base Command (MonoPhp\Cli\Tests\Unit\Commands\BaseCommand)
+ [x] Can set container
+ [x] Line writes output
+ [x] Is verbose checks verbosity
+ [x] Is quiet checks quiet mode
+ [x] Option retrieves option value
+ [x] Has option checks option existence
+
+Container (MonoPhp\Cli\Tests\Unit\Support\Container)
+ [x] Get instance returns singleton
+ [x] Can bind and resolve services
+ [x] Can bind singleton
+ [x] Can bind instance
+
+Filesystem (MonoPhp\Cli\Tests\Unit\Support\Filesystem)
+ [x] Exists checks file existence
+ [x] Is file checks if path is file
+ [x] Is directory checks if path is directory
+ [x] Read returns file contents
+ [x] Read throws exception for nonexistent file
+ [x] Write creates file with content
+ [x] Write creates parent directories
+ [x] Make directory creates directory
+ [x] Make directory with recursive creates nested directories
+ [x] Delete removes file
+ [x] Delete directory removes directory recursively
+ [x] Files lists files in directory
+ [x] Directories lists directories
+ [x] Glob finds matching files
+ [x] Last modified returns modification time
+ [x] All files returns all files recursively
+
+Reflection (MonoPhp\Cli\Tests\Unit\Support\Reflection)
+ [x] Exists checks class existence
+ [x] Method exists checks method existence
+ [x] Property exists checks property existence
+ [x] Get class name returns full class name
+ [x] Get class short name returns short name
+ [x] Is abstract checks if class is abstract
+ [x] Is final checks if class is final
+ [x] Has method checks method existence
+ [x] Get methods returns all methods
+ [x] Get properties returns all properties
+

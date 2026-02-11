@@ -234,7 +234,7 @@ final class Filesystem
         }
 
         // Filter out . and .. and return only files
-        return array_values(array_filter($files, fn (string $file) => $file !== '.' && $file !== '..' && $this->isFile($path . DIRECTORY_SEPARATOR . $file)));
+        return array_values(array_filter($files, fn (string $file): bool => $file !== '.' && $file !== '..' && $this->isFile($path . DIRECTORY_SEPARATOR . $file)));
     }
 
     /**
@@ -262,7 +262,7 @@ final class Filesystem
         }
 
         // Filter out . and .. and return only directories
-        return array_values(array_filter($items, fn (string $item) => $item !== '.' && $item !== '..' && $this->isDirectory($path . DIRECTORY_SEPARATOR . $item)));
+        return array_values(array_filter($items, fn (string $item): bool => $item !== '.' && $item !== '..' && $this->isDirectory($path . DIRECTORY_SEPARATOR . $item)));
     }
 
     /**

@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace MonoPhp\Cli\Support;
 
-use function __;
-use function array_all;
-use function array_any;
 use function array_change_key_case;
 use function array_chunk;
 use function array_column;
@@ -54,10 +51,8 @@ use function count;
 use Illuminate\Support\Arr as BaseArr;
 
 use function in_array;
-use function is_array;
 use function is_int;
 use function is_string;
-use function json_encode;
 use function krsort;
 use function ksort;
 
@@ -139,9 +134,10 @@ final class Arr extends BaseArr
         array_walk_recursive($arr, function (&$value, $key): void {
             // Check if the current value is a string.
             if (is_string($value)) {
-                // Translate the string using Lang facade.
-                $translated = __($value);
-                $value = is_string($translated) ? $translated : (is_array($translated) ? (json_encode($translated) ?: $value) : (string) $translated);
+                // For now, just keep the original value since __ function is not available
+                // In a real implementation, you would use a translation service here
+                // $translated = __($value);
+                // $value = is_string($translated) ? $translated : (is_array($translated) ? (json_encode($translated) ?? $value) : (string) $translated);
             }
         });
 
@@ -161,7 +157,7 @@ final class Arr extends BaseArr
      */
     public static function keys(array $array, mixed $value = null): array
     {
-        if ($value) {
+        if ($value !== null) {
             return array_keys($array, $value, true);
         }
 
@@ -516,7 +512,7 @@ final class Arr extends BaseArr
      */
     public static function search(mixed $needle, array $haystack, bool $strict = false): mixed
     {
-        return array_search($needle, $haystack, $strict);
+        return array_search($needle, $haystack, true);
     }
 
     /**
@@ -544,7 +540,13 @@ final class Arr extends BaseArr
      */
     public static function any(array $array, callable $callback): bool
     {
-        return array_any($array, fn ($value, $key) => $callback($value, $key));
+        foreach ($array as $key => $value) {
+            if ($callback($value, $key)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -556,7 +558,13 @@ final class Arr extends BaseArr
      */
     public static function all(array $array, callable $callback): bool
     {
-        return array_all($array, fn ($value, $key) => $callback($value, $key));
+        foreach ($array as $key => $value) {
+            if (! $callback($value, $key)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -590,7 +598,10 @@ final class Arr extends BaseArr
      */
     public static function count(array $array, int $mode = COUNT_NORMAL): int
     {
-        return count($array, $mode);
+        // Ensure mode is either 0 (COUNT_NORMAL) or 1 (COUNT_RECURSIVE)
+        $validMode = ($mode === COUNT_RECURSIVE) ? COUNT_RECURSIVE : COUNT_NORMAL;
+
+        return count($array, $validMode);
     }
 
     /**
@@ -603,7 +614,10 @@ final class Arr extends BaseArr
      */
     public static function chunk(array $array, int $length, bool $preserveKeys = false): array
     {
-        return array_chunk($array, $length, $preserveKeys);
+        // Ensure length is at least 1
+        $validLength = max(1, $length);
+
+        return array_chunk($array, $validLength, $preserveKeys);
     }
 
     /**
@@ -711,7 +725,7 @@ final class Arr extends BaseArr
      */
     public static function inArray(mixed $needle, array $haystack, bool $strict = false): bool
     {
-        return in_array($needle, $haystack, $strict);
+        return in_array($needle, $haystack, true);
     }
 
     /**

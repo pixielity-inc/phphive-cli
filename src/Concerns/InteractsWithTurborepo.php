@@ -229,9 +229,21 @@ trait InteractsWithTurborepo
         }
 
         // Parse JSON configuration
-        $config = json_decode(file_get_contents($turboJson), true);
+        $content = file_get_contents($turboJson);
+        if ($content === false) {
+            return [];
+        }
+        $config = json_decode($content, true);
+        if (! is_array($config)) {
+            return [];
+        }
 
         // Extract task names from tasks object
-        return array_keys($config['tasks'] ?? []);
+        $tasks = $config['tasks'] ?? [];
+        if (! is_array($tasks)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_keys($tasks), 'is_string'));
     }
 }

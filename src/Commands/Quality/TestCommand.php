@@ -154,13 +154,14 @@ final class TestCommand extends BaseCommand
 
         // Determine which test task to run based on options
         // This selects between test, test:unit, test:feature, or test:coverage
-        $task = $this->determineTestTask($input);
+        $task = $this->determineTestTask();
 
         // Build Turbo options array
         $options = [];
 
         // Handle workspace filtering
-        if ($workspace = $input->getOption('workspace')) {
+        $workspace = $input->getOption('workspace');
+        if (is_string($workspace) && $workspace !== '') {
             // Verify workspace exists before proceeding
             // This prevents cryptic errors from Turbo
             if (! $this->hasWorkspace($workspace)) {
@@ -179,7 +180,8 @@ final class TestCommand extends BaseCommand
 
         // Show test name filter if specified
         // This is passed to PHPUnit's --filter option
-        if ($filter = $input->getOption('filter')) {
+        $filter = $input->getOption('filter');
+        if (is_string($filter) && $filter !== '') {
             $this->comment("Filter: {$filter}");
         }
 
@@ -212,32 +214,28 @@ final class TestCommand extends BaseCommand
      * - --coverage → test:coverage
      * - (none) → test (all tests)
      *
-     * @param  InputInterface $input Command input with options
-     * @return string         Turbo task name to execute
+     * @return string Turbo task name to execute
      */
-    private function determineTestTask(InputInterface $input): string
+    private function determineTestTask(): string
     {
         // Check for unit tests flag
-        if ($input->getOption('unit')) {
+        if ($this->hasOption('unit')) {
             $this->info('Running unit tests...');
 
             return 'test:unit';
         }
-
         // Check for feature tests flag
-        if ($input->getOption('feature')) {
+        if ($this->hasOption('feature')) {
             $this->info('Running feature tests...');
 
             return 'test:feature';
         }
-
         // Check for coverage flag
-        if ($input->getOption('coverage')) {
+        if ($this->hasOption('coverage')) {
             $this->info('Running tests with coverage...');
 
             return 'test:coverage';
         }
-
         // Default: run all tests
         $this->info('Running all tests...');
 

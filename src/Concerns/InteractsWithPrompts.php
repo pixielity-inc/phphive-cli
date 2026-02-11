@@ -468,20 +468,22 @@ trait InteractsWithPrompts
      * @param  string                             $label    The progress bar label
      * @param  Closure(mixed, Progress):void|null $callback Optional callback for each item
      * @param  string                             $hint     Helpful hint
-     * @return array<mixed>|void                  Returns processed items if no callback provided
+     * @return array<mixed>                       Returns processed items if no callback provided
      */
     protected function progress(
         string $label,
         iterable|int $steps,
         ?Closure $callback = null,
         string $hint = '',
-    ): mixed {
-        return progress(
+    ): array {
+        $result = progress(
             label: $label,
             steps: $steps,
             callback: $callback,
             hint: $hint,
         );
+
+        return is_array($result) ? $result : [];
     }
 
     /**

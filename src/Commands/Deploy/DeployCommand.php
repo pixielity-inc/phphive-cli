@@ -117,14 +117,15 @@ final class DeployCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Extract options from user input
-        $workspace = $this->option('workspace');
+        $workspaceOption = $this->option('workspace');
+        $workspace = is_string($workspaceOption) && $workspaceOption !== '' ? $workspaceOption : null;
         $skipTests = $this->hasOption('skip-tests');
 
         // Display intro banner
         $this->intro('Deployment Pipeline');
 
         // Show what we're deploying
-        if ($workspace) {
+        if ($workspace !== null) {
             // Deploying specific app
             $this->info("Deploying workspace: {$workspace}");
         } else {
@@ -144,7 +145,7 @@ final class DeployCommand extends BaseCommand
         $options = [];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if ($workspace !== null) {
             $options['filter'] = $workspace;
         }
 

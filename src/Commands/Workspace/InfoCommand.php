@@ -125,7 +125,7 @@ final class InfoCommand extends BaseCommand
         // This allows both direct specification and interactive selection
         $workspaceName = $input->getArgument('workspace');
 
-        if (! $workspaceName) {
+        if ($workspaceName === null || $workspaceName === '') {
             // No workspace specified - discover all workspaces
             $workspaces = $this->getWorkspaces();
 
@@ -148,7 +148,7 @@ final class InfoCommand extends BaseCommand
         $workspace = $this->getWorkspace($workspaceName);
 
         // Validate workspace exists
-        if (! $workspace) {
+        if ($workspace === null || $workspace === []) {
             $this->error("Workspace '{$workspaceName}' not found");
 
             return Command::FAILURE;
@@ -165,14 +165,14 @@ final class InfoCommand extends BaseCommand
 
         // Display Composer configuration if composer.json exists
         // Shows dependencies, dev dependencies, and package metadata
-        if ($workspace['hasComposer']) {
+        if ($workspace['hasComposer'] === true) {
             $this->displayComposerInfo($workspace);
             $this->line('');
         }
 
         // Display package.json configuration if it exists
         // Shows npm dependencies, scripts, and package metadata
-        if ($workspace['hasPackageJson']) {
+        if ($workspace['hasPackageJson'] === true) {
             $this->displayPackageInfo($workspace);
             $this->line('');
         }
@@ -214,7 +214,7 @@ final class InfoCommand extends BaseCommand
     {
         $composerJson = $this->getWorkspaceComposerJson($workspace['name']);
 
-        if (! $composerJson) {
+        if ($composerJson === null || $composerJson === []) {
             return;
         }
 
@@ -233,7 +233,7 @@ final class InfoCommand extends BaseCommand
         }
 
         // Dependencies
-        if (isset($composerJson['require']) && ! empty($composerJson['require'])) {
+        if (isset($composerJson['require']) && count($composerJson['require']) > 0) {
             $this->line('');
             $this->comment('  Dependencies:');
 
@@ -243,7 +243,7 @@ final class InfoCommand extends BaseCommand
         }
 
         // Dev dependencies
-        if (isset($composerJson['require-dev']) && ! empty($composerJson['require-dev'])) {
+        if (isset($composerJson['require-dev']) && count($composerJson['require-dev']) > 0) {
             $this->line('');
             $this->comment('  Dev Dependencies:');
 
@@ -265,7 +265,7 @@ final class InfoCommand extends BaseCommand
     {
         $packageJson = $this->getWorkspacePackageJson($workspace['name']);
 
-        if (! $packageJson) {
+        if ($packageJson === null || $packageJson === []) {
             return;
         }
 
@@ -280,7 +280,7 @@ final class InfoCommand extends BaseCommand
         }
 
         // Scripts
-        if (isset($packageJson['scripts']) && ! empty($packageJson['scripts'])) {
+        if (isset($packageJson['scripts']) && count($packageJson['scripts']) > 0) {
             $this->line('');
             $this->comment('  Available Scripts:');
 

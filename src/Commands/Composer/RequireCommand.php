@@ -142,7 +142,7 @@ final class RequireCommand extends BaseCommand
         // Get or select workspace
         $workspace = $input->getOption('workspace');
 
-        if (! $workspace) {
+        if (! is_string($workspace) || $workspace === '') {
             // No workspace specified - prompt user to select one
             $workspaces = $this->getWorkspaces();
 
@@ -158,6 +158,13 @@ final class RequireCommand extends BaseCommand
                 'Select workspace',
                 array_column($workspaces, 'name'),
             );
+
+            // Ensure workspace is a string after selection
+            if (! is_string($workspace)) {
+                $this->error('Invalid workspace selection');
+
+                return Command::FAILURE;
+            }
         }
 
         // Verify workspace exists
@@ -170,7 +177,7 @@ final class RequireCommand extends BaseCommand
         // Display installation details
         $this->info("Adding package: {$package}");
         $this->comment("Workspace: {$workspace}");
-        $this->comment('Type: ' . ($isDev ? 'development' : 'production'));
+        $this->comment('Type: ' . ((in_array($isDev, [true, '1', 1], true)) ? 'development' : 'production'));
         $this->line('');
 
         // Run composer require in workspace directory

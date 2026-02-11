@@ -141,32 +141,44 @@ final class DoctorCommand extends BaseCommand
 
         // Check PHP version and required extensions
         // Validates PHP >= 8.2.0 and json, mbstring, xml extensions
-        $allPassed = $this->checkPhp() && $allPassed;
+        if (! $this->checkPhp()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Check Composer installation and version
         // Validates composer command is available
-        $allPassed = $this->checkComposer() && $allPassed;
+        if (! $this->checkComposer()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Check Turbo installation and version
         // Validates turbo command is available for monorepo orchestration
-        $allPassed = $this->checkTurbo() && $allPassed;
+        if (! $this->checkTurbo()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Check Node.js installation and version
         // Validates node command is available for JavaScript tooling
-        $allPassed = $this->checkNode() && $allPassed;
+        if (! $this->checkNode()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Check pnpm installation and version
         // Validates pnpm command is available for workspace management
-        $allPassed = $this->checkPnpm() && $allPassed;
+        if (! $this->checkPnpm()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Check workspace configuration
         // Validates pnpm-workspace.yaml and discovers workspaces
-        $allPassed = $this->checkWorkspaces() && $allPassed;
+        if (! $this->checkWorkspaces()) {
+            $allPassed = false;
+        }
         $this->line('');
 
         // Report overall health status

@@ -13,6 +13,7 @@ use function json_encode;
 use MonoPhp\Cli\Commands\BaseCommand;
 use MonoPhp\Cli\Support\Filesystem;
 use Override;
+use RuntimeException;
 
 use function str_replace;
 
@@ -226,13 +227,21 @@ final class CreatePackageCommand extends BaseCommand
         // Note: type is "library" for packages vs "project" for apps
         $this->info('Creating composer.json...');
         $composerJson = $this->generateComposerJson($name);
-        $filesystem->write("{$packagePath}/composer.json", json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $composerJsonContent = json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($composerJsonContent === false) {
+            throw new RuntimeException('Failed to encode composer.json');
+        }
+        $filesystem->write("{$packagePath}/composer.json", $composerJsonContent);
 
         // Create package.json
         // This file defines Turbo tasks and npm scripts for the package
         $this->info('Creating package.json...');
         $packageJson = $this->generatePackageJson($name);
-        $filesystem->write("{$packagePath}/package.json", json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $packageJsonContent = json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($packageJsonContent === false) {
+            throw new RuntimeException('Failed to encode package.json');
+        }
+        $filesystem->write("{$packagePath}/package.json", $packageJsonContent);
 
         // Create README
         // This provides documentation and usage instructions for the package

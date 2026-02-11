@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace MonoPhp\Cli\Support;
 
 use Illuminate\Container\Container as IlluminateContainer;
-
-use function is_null;
-
 use Override;
 
 /**
@@ -53,7 +50,7 @@ final class Container extends IlluminateContainer
     #[Override]
     public static function getInstance(): static
     {
-        if (is_null(self::$instance)) {
+        if (self::$instance === null) {
             self::$instance = new self();
         }
 

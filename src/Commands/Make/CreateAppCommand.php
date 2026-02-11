@@ -13,6 +13,7 @@ use function json_encode;
 use MonoPhp\Cli\Commands\BaseCommand;
 use MonoPhp\Cli\Support\Filesystem;
 use Override;
+use RuntimeException;
 
 use function str_replace;
 
@@ -210,13 +211,21 @@ final class CreateAppCommand extends BaseCommand
         // This file defines PHP dependencies, autoloading, and package metadata
         $this->info('Creating composer.json...');
         $composerJson = $this->generateComposerJson($name);
-        $filesystem->write("{$appPath}/composer.json", json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $composerJsonContent = json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($composerJsonContent === false) {
+            throw new RuntimeException('Failed to encode composer.json');
+        }
+        $filesystem->write("{$appPath}/composer.json", $composerJsonContent);
 
         // Create package.json
         // This file defines Turbo tasks and npm scripts for the application
         $this->info('Creating package.json...');
         $packageJson = $this->generatePackageJson($name);
-        $filesystem->write("{$appPath}/package.json", json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $packageJsonContent = json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($packageJsonContent === false) {
+            throw new RuntimeException('Failed to encode package.json');
+        }
+        $filesystem->write("{$appPath}/package.json", $packageJsonContent);
 
         // Create index.php
         // This is the application entry point for web requests

@@ -336,6 +336,13 @@ abstract class BaseCommand extends Command
      */
     protected function hasOption(string $name): bool
     {
-        return $this->input->hasOption($name) && $this->option($name);
+        // First check if the option is defined in the command
+        if (! $this->input->hasOption($name)) {
+            return false;
+        }
+
+        $optionValue = $this->option($name);
+
+        return in_array($optionValue, [true, '1', 1], true);
     }
 }

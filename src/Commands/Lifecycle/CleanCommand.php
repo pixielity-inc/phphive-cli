@@ -133,7 +133,7 @@ final class CleanCommand extends BaseCommand
         $this->intro('Cleaning Caches');
 
         // Show what we're cleaning
-        if ($workspace) {
+        if ($workspace !== null && $workspace !== '') {
             // Cleaning specific workspace
             $this->info("Cleaning workspace: {$workspace}");
         } else {
@@ -147,7 +147,7 @@ final class CleanCommand extends BaseCommand
         $options = ['cache' => false];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if ($workspace !== null && $workspace !== '') {
             $options['filter'] = $workspace;
         }
 

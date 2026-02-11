@@ -153,7 +153,10 @@ final class ListCommand extends BaseCommand
         if ($this->hasOption('json')) {
             // Output raw JSON for scripting/automation
             // Pretty-print for readability
-            $output->writeln(json_encode($workspaces, JSON_PRETTY_PRINT));
+            $jsonOutput = json_encode($workspaces, JSON_PRETTY_PRINT);
+            if ($jsonOutput !== false) {
+                $output->writeln($jsonOutput);
+            }
 
             return Command::SUCCESS;
         }

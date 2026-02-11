@@ -120,7 +120,8 @@ final class BuildCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Extract options from user input
-        $workspace = $this->option('workspace');
+        $workspaceOption = $this->option('workspace');
+        $workspace = is_string($workspaceOption) && $workspaceOption !== '' ? $workspaceOption : null;
         $force = $this->hasOption('force');
         $noCache = $this->hasOption('no-cache');
 
@@ -128,7 +129,7 @@ final class BuildCommand extends BaseCommand
         $this->intro('Building for Production');
 
         // Show what we're building
-        if ($workspace) {
+        if ($workspace !== null) {
             // Building specific workspace
             $this->info("Building workspace: {$workspace}");
         } else {
@@ -142,7 +143,7 @@ final class BuildCommand extends BaseCommand
         $options = [];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if ($workspace !== null) {
             $options['filter'] = $workspace;
         }
 

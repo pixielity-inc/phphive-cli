@@ -164,7 +164,7 @@ final class VersionCommand extends BaseCommand
         $this->info('Turbo:');
         $turboVersion = $this->getToolVersion('turbo --version');
 
-        if ($turboVersion) {
+        if ($turboVersion !== null && $turboVersion !== '') {
             $this->line("  Version: {$turboVersion}");
         } else {
             $this->line('  Not installed');
@@ -177,7 +177,7 @@ final class VersionCommand extends BaseCommand
         $this->info('Node.js:');
         $nodeVersion = $this->getToolVersion('node --version');
 
-        if ($nodeVersion) {
+        if ($nodeVersion !== null && $nodeVersion !== '') {
             $this->line("  Version: {$nodeVersion}");
         } else {
             $this->line('  Not installed');
@@ -190,7 +190,7 @@ final class VersionCommand extends BaseCommand
         $this->info('pnpm:');
         $pnpmVersion = $this->getToolVersion('pnpm --version');
 
-        if ($pnpmVersion) {
+        if ($pnpmVersion !== null && $pnpmVersion !== '') {
             $this->line("  Version: {$pnpmVersion}");
         } else {
             $this->line('  Not installed');

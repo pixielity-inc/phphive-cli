@@ -149,7 +149,7 @@ final class UpdateCommand extends BaseCommand
         // Get or select workspace
         $workspace = $input->getOption('workspace');
 
-        if (! $workspace) {
+        if (! is_string($workspace) || $workspace === '') {
             // No workspace specified - prompt user to select one
             $workspaces = $this->getWorkspaces();
 
@@ -165,6 +165,13 @@ final class UpdateCommand extends BaseCommand
                 'Select workspace',
                 array_column($workspaces, 'name'),
             );
+
+            // Ensure workspace is a string after selection
+            if (! is_string($workspace)) {
+                $this->error('Invalid workspace selection');
+
+                return Command::FAILURE;
+            }
         }
 
         // Verify workspace exists
@@ -175,7 +182,7 @@ final class UpdateCommand extends BaseCommand
         }
 
         // Display update details
-        if ($package) {
+        if (is_string($package) && $package !== '') {
             // Targeted update - specific package only
             $this->info("Updating package: {$package}");
         } else {
@@ -193,7 +200,7 @@ final class UpdateCommand extends BaseCommand
         // Report results to user
         if ($exitCode === 0) {
             // Success - dependencies updated
-            if ($package) {
+            if (is_string($package) && $package !== '') {
                 $this->outro("✓ Package '{$package}' updated successfully");
             } else {
                 $this->outro('✓ Dependencies updated successfully');

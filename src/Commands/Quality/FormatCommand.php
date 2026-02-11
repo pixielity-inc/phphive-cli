@@ -8,6 +8,7 @@ use function count;
 
 use MonoPhp\Cli\Commands\BaseCommand;
 use Override;
+use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -107,14 +108,21 @@ final class FormatCommand extends BaseCommand
         if ($check) {
             $this->info('Check mode enabled, running lint command...');
 
-            return $this->getApplication()->find('lint')->run($input, $output);
+            $application = $this->getApplication();
+            if (! $application instanceof Application) {
+                $this->error('Application not available');
+
+                return Command::FAILURE;
+            }
+
+            return $application->find('lint')->run($input, $output);
         }
 
         // Display intro banner
         $this->intro('Fixing Code Style');
 
         // Show what we're formatting
-        if ($workspace) {
+        if (is_string($workspace) && $workspace !== '') {
             // Formatting specific workspace
             $this->info("Formatting workspace: {$workspace}");
         } else {
@@ -127,7 +135,7 @@ final class FormatCommand extends BaseCommand
         $options = [];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if (is_string($workspace) && $workspace !== '') {
             $options['filter'] = $workspace;
         }
 

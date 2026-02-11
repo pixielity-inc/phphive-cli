@@ -18,6 +18,8 @@ use function sprintf;
 
 use Symfony\Component\Console\Application as BaseApplication;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * CLI Application.
@@ -157,12 +159,12 @@ final class Application extends BaseApplication
      * - ASCII art banner display
      * - Command execution
      *
-     * @param  mixed $input  Optional input interface (defaults to stdin)
-     * @param  mixed $output Optional output interface (defaults to stdout)
-     * @return int   Exit code (0 for success, non-zero for failure)
+     * @param  InputInterface|null  $input  Optional input interface (defaults to stdin)
+     * @param  OutputInterface|null $output Optional output interface (defaults to stdout)
+     * @return int                  Exit code (0 for success, non-zero for failure)
      */
     #[Override]
-    public function run(?\Symfony\Component\Console\Input\InputInterface $input = null, ?\Symfony\Component\Console\Output\OutputInterface $output = null): int
+    public function run(?InputInterface $input = null, ?OutputInterface $output = null): int
     {
         // Ensure application is booted before running
         if (! $this->booted) {

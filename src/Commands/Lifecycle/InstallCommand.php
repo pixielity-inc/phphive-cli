@@ -130,7 +130,7 @@ final class InstallCommand extends BaseCommand
         $noCache = $this->hasOption('no-cache');
 
         // Show what we're installing
-        if ($workspace) {
+        if ($workspace !== null && $workspace !== '') {
             // Installing specific workspace
             $this->info("Installing dependencies for workspace: {$workspace}");
         } else {
@@ -144,7 +144,7 @@ final class InstallCommand extends BaseCommand
         $options = [];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if ($workspace !== null && $workspace !== '') {
             $options['filter'] = $workspace;
         }
 

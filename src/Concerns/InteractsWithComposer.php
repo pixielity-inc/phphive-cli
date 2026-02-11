@@ -130,7 +130,7 @@ trait InteractsWithComposer
         $path = $this->getWorkspacePath($workspace);
 
         // Add package name if updating specific package
-        $pkg = $package ? " {$package}" : '';
+        $pkg = ($package !== null) ? " {$package}" : '';
 
         return $this->composer("update{$pkg}", $path);
     }
@@ -173,6 +173,6 @@ trait InteractsWithComposer
         // Extract version number using regex (e.g., "Composer version 2.7.1")
         preg_match('/Composer version ([0-9.]+)/', $process->getOutput(), $matches);
 
-        return $matches[1] ?? null;
+        return (isset($matches[1]) && is_string($matches[1])) ? $matches[1] : null;
     }
 }

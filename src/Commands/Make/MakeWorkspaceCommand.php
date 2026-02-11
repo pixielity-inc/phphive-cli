@@ -192,7 +192,7 @@ final class MakeWorkspaceCommand extends BaseCommand
         // Get workspace name from argument or prompt
         $name = $this->argument('name');
 
-        if (! $name && ! $this->hasOption('no-interaction')) {
+        if (($name === null || $name === '') && $this->hasOption('no-interaction') === false) {
             // Interactive mode - prompt for name
             $name = $this->text(
                 label: 'What is the workspace name?',
@@ -200,7 +200,7 @@ final class MakeWorkspaceCommand extends BaseCommand
                 required: true,
                 validate: fn (?string $value): ?string => $this->validateWorkspaceName($value),
             );
-        } elseif (! $name) {
+        } elseif ($name === null || $name === '') {
             // Non-interactive mode without name - error
             $this->error('Workspace name is required in non-interactive mode');
 
@@ -297,11 +297,11 @@ final class MakeWorkspaceCommand extends BaseCommand
      */
     private function validateWorkspaceName(?string $name): ?string
     {
-        if (! $name || trim($name) === '') {
+        if ($name === null || trim($name) === '') {
             return 'Workspace name cannot be empty';
         }
 
-        if (! preg_match('/^[a-z][a-z0-9-]*$/', $name)) {
+        if (preg_match('/^[a-z][a-z0-9-]*$/', $name) !== 1) {
             return 'Workspace name must start with a letter and contain only lowercase letters, numbers, and hyphens';
         }
 

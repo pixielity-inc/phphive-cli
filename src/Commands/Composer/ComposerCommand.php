@@ -152,7 +152,7 @@ final class ComposerCommand extends BaseCommand
         // Get or select workspace
         $workspace = $input->getOption('workspace');
 
-        if (! $workspace) {
+        if (! is_string($workspace) || $workspace === '') {
             // No workspace specified - prompt user to select one
             $workspaces = $this->getWorkspaces();
 
@@ -168,6 +168,13 @@ final class ComposerCommand extends BaseCommand
                 'Select workspace',
                 array_column($workspaces, 'name'),
             );
+
+            // Ensure workspace is a string after selection
+            if (! is_string($workspace)) {
+                $this->error('Invalid workspace selection');
+
+                return Command::FAILURE;
+            }
         }
 
         // Verify workspace exists

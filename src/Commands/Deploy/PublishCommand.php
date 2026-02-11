@@ -147,8 +147,10 @@ final class PublishCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Extract options from user input
-        $workspace = $this->option('workspace');
-        $tag = $this->option('tag') ?? 'latest'; // Default to 'latest' tag
+        $workspaceOption = $this->option('workspace');
+        $workspace = is_string($workspaceOption) && $workspaceOption !== '' ? $workspaceOption : null;
+        $tagOption = $this->option('tag');
+        $tag = is_string($tagOption) && $tagOption !== '' ? $tagOption : 'latest'; // Default to 'latest' tag
         $dryRun = $this->hasOption('dry-run');
 
         // Display intro banner
@@ -166,7 +168,7 @@ final class PublishCommand extends BaseCommand
         }
 
         // If no workspace specified, prompt user to select one
-        if (! $workspace) {
+        if ($workspace === null) {
             if (count($packages) === 1) {
                 // Only one package - auto-select it
                 $workspace = $packages[0]['name'];
@@ -182,7 +184,7 @@ final class PublishCommand extends BaseCommand
         // Verify the selected workspace is actually a package
         // This prevents accidentally trying to publish an app
         $package = $this->getWorkspace($workspace);
-        if (! $package || $package['type'] !== 'package') {
+        if ($package === null || $package['type'] !== 'package') {
             $this->error("'{$workspace}' is not a package");
 
             return Command::FAILURE;

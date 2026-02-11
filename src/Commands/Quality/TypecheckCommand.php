@@ -107,7 +107,7 @@ final class TypecheckCommand extends BaseCommand
         $this->intro('Running Static Analysis');
 
         // Show what we're checking
-        if ($workspace) {
+        if (is_string($workspace) && $workspace !== '') {
             // Checking specific workspace
             $this->info("Checking workspace: {$workspace}");
         } else {
@@ -118,7 +118,7 @@ final class TypecheckCommand extends BaseCommand
 
         // Show PHPStan level if specified
         // Higher levels are stricter and catch more issues
-        if ($level) {
+        if (is_string($level) && $level !== '') {
             $this->info("PHPStan level: {$level}");
         }
 
@@ -127,7 +127,7 @@ final class TypecheckCommand extends BaseCommand
         $options = [];
 
         // Filter to specific workspace if requested
-        if ($workspace) {
+        if (is_string($workspace) && $workspace !== '') {
             $options['filter'] = $workspace;
         }
 

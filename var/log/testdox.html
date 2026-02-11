@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>Test Documentation</title>
+        <style>
+            body {
+                text-rendering: optimizeLegibility;
+                font-family: Source SansSerif Pro, Arial, sans-serif;
+                font-variant-ligatures: common-ligatures;
+                font-kerning: normal;
+                margin-left: 2rem;
+                background-color: #fff;
+                color: #000;
+            }
+
+            body > ul > li {
+                font-size: larger;
+            }
+
+            h2 {
+                font-size: larger;
+                text-decoration-line: underline;
+                text-decoration-thickness: 2px;
+                margin: 0;
+                padding: 0.5rem 0;
+            }
+
+            ul {
+                list-style: none;
+                margin: 0 0 2rem;
+                padding: 0 0 0 1rem;
+                text-indent: -1rem;
+            }
+
+            .success:before {
+                color: #4e9a06;
+                content: '✓';
+                padding-right: 0.5rem;
+            }
+
+            .defect {
+                color: #a40000;
+            }
+
+            .defect:before {
+                color: #a40000;
+                content: '✗';
+                padding-right: 0.5rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Application (MonoPhp\Cli\Tests\Unit\Application)</h2>
+        <ul>
+            <li class="success">Can create application instance</li>
+            <li class="success">Make creates and boots application</li>
+            <li class="success">Container returns container instance</li>
+            <li class="success">Boot discovers commands</li>
+            <li class="success">Has default command</li>
+            <li class="success">Get long version returns formatted string</li>
+        </ul>
+        <h2>Arr (MonoPhp\Cli\Tests\Unit\Support\Arr)</h2>
+        <ul>
+            <li class="success">Build transforms array with callback</li>
+            <li class="success">Keys returns array keys</li>
+            <li class="success">Values returns array values</li>
+            <li class="success">Flip swaps keys and values</li>
+            <li class="success">Combine creates array from keys and values</li>
+            <li class="success">Key exists checks for key</li>
+            <li class="success">Unique removes duplicates</li>
+            <li class="success">Diff returns difference</li>
+            <li class="success">Intersect returns intersection</li>
+            <li class="success">Merge combines arrays</li>
+            <li class="success">Chunk splits array</li>
+            <li class="success">Filter removes elements</li>
+            <li class="success">In array checks value existence</li>
+            <li class="success">Sum calculates total</li>
+            <li class="success">Product calculates product</li>
+            <li class="success">Count returns element count</li>
+        </ul>
+        <h2>Base Command (MonoPhp\Cli\Tests\Unit\Commands\BaseCommand)</h2>
+        <ul>
+            <li class="success">Can set container</li>
+            <li class="success">Line writes output</li>
+            <li class="success">Is verbose checks verbosity</li>
+            <li class="success">Is quiet checks quiet mode</li>
+            <li class="success">Option retrieves option value</li>
+            <li class="success">Has option checks option existence</li>
+        </ul>
+        <h2>Container (MonoPhp\Cli\Tests\Unit\Support\Container)</h2>
+        <ul>
+            <li class="success">Get instance returns singleton</li>
+            <li class="success">Can bind and resolve services</li>
+            <li class="success">Can bind singleton</li>
+            <li class="success">Can bind instance</li>
+        </ul>
+        <h2>Filesystem (MonoPhp\Cli\Tests\Unit\Support\Filesystem)</h2>
+        <ul>
+            <li class="success">Exists checks file existence</li>
+            <li class="success">Is file checks if path is file</li>
+            <li class="success">Is directory checks if path is directory</li>
+            <li class="success">Read returns file contents</li>
+            <li class="success">Read throws exception for nonexistent file</li>
+            <li class="success">Write creates file with content</li>
+            <li class="success">Write creates parent directories</li>
+            <li class="success">Make directory creates directory</li>
+            <li class="success">Make directory with recursive creates nested directories</li>
+            <li class="success">Delete removes file</li>
+            <li class="success">Delete directory removes directory recursively</li>
+            <li class="success">Files lists files in directory</li>
+            <li class="success">Directories lists directories</li>
+            <li class="success">Glob finds matching files</li>
+            <li class="success">Last modified returns modification time</li>
+            <li class="success">All files returns all files recursively</li>
+        </ul>
+        <h2>Reflection (MonoPhp\Cli\Tests\Unit\Support\Reflection)</h2>
+        <ul>
+            <li class="success">Exists checks class existence</li>
+            <li class="success">Method exists checks method existence</li>
+            <li class="success">Property exists checks property existence</li>
+            <li class="success">Get class name returns full class name</li>
+            <li class="success">Get class short name returns short name</li>
+            <li class="success">Is abstract checks if class is abstract</li>
+            <li class="success">Is final checks if class is final</li>
+            <li class="success">Has method checks method existence</li>
+            <li class="success">Get methods returns all methods</li>
+            <li class="success">Get properties returns all properties</li>
+        </ul>
+    </body>
+</html>

@@ -219,31 +219,32 @@ final class TurboCommand extends BaseCommand
 
         // Filter to specific workspace(s)
         // Can be a single workspace or pattern
-        if ($filter = $input->getOption('filter')) {
+        $filter = $input->getOption('filter');
+        if (! in_array($filter, [null, false, ''], true)) {
             $options['filter'] = $filter;
         }
 
         // Force execution (bypass cache)
         // Useful when you need to ensure command runs regardless of cache state
-        if ($input->getOption('force')) {
+        if ($input->getOption('force') === true) {
             $options['force'] = true;
         }
 
         // Disable caching entirely
         // Different from force - this prevents cache reads and writes
-        if ($input->getOption('no-cache')) {
+        if ($input->getOption('no-cache') === true) {
             $options['cache'] = false;
         }
 
         // Enable parallel execution
         // Forces parallel mode even for commands that might run sequentially
-        if ($input->getOption('parallel')) {
+        if ($input->getOption('parallel') === true) {
             $options['parallel'] = true;
         }
 
         // Continue on error
         // Don't stop on first failure - run all commands
-        if ($input->getOption('continue')) {
+        if ($input->getOption('continue') === true) {
             $options['continue'] = true;
         }
 

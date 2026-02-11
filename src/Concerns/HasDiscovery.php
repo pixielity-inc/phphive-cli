@@ -105,7 +105,7 @@ trait HasDiscovery
             // Build fully qualified class name from file path
             // Example: /path/to/Command/Install/InstallCommand.php
             //       -> \MonoPhp\Cli\Command\Install\InstallCommand
-            $relativePath = str_replace($path, '', $file->getPathname());
+            $relativePath = str_replace($path, '', (string) $file->getPathname());
             $relativePath = str_replace(['/', '.php'], ['\\', ''], $relativePath);
             $className = "{$namespace}{$relativePath}";
 
@@ -153,7 +153,7 @@ trait HasDiscovery
 
         // Check for AsCommand attribute (Symfony 6.1+)
         // This is the modern way to define commands
-        return (bool) $this->hasAsCommandAttribute($className);
+        return $this->hasAsCommandAttribute($className);
     }
 
     /**

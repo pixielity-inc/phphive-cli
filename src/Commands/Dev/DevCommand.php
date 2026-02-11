@@ -123,10 +123,11 @@ final class DevCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Get workspace from option if provided
-        $workspace = $this->option('workspace');
+        $workspaceOption = $this->option('workspace');
+        $workspace = is_string($workspaceOption) && $workspaceOption !== '' ? $workspaceOption : null;
 
         // If no workspace specified, provide interactive selection
-        if (! $workspace) {
+        if ($workspace === null) {
             // Get all application workspaces (not packages)
             $apps = $this->getApps();
 

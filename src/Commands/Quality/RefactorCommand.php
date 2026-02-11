@@ -128,8 +128,8 @@ final class RefactorCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Extract options from user input
-        $dryRun = $input->getOption('dry-run');
-        $clearCache = $input->getOption('clear-cache');
+        $dryRun = $this->hasOption('dry-run');
+        $clearCache = $this->hasOption('clear-cache');
 
         // Display intro banner with appropriate message
         $this->intro($dryRun ? 'Previewing refactoring changes...' : 'Running Rector refactoring...');

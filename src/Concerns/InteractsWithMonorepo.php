@@ -128,9 +128,12 @@ trait InteractsWithMonorepo
 
         // Parse workspace patterns from YAML file
         $content = file_get_contents($workspaceFile);
+        if ($content === false) {
+            return [];
+        }
         preg_match_all('/- "([^"]+)"/', $content, $matches);
 
-        $patterns = $matches[1] ?? [];
+        $patterns = $matches[1];
         $workspaces = [];
 
         // Process each workspace pattern
@@ -151,10 +154,22 @@ trait InteractsWithMonorepo
                 $name = $directory->getFilename();
                 $path = $directory->getRealPath();
 
+                // Skip if path is false
+                if ($path === false) {
+                    continue;
+                }
+
                 // Only include directories with package.json
                 if (file_exists($path . '/package.json')) {
                     // Parse package.json for metadata
-                    $packageJson = json_decode(file_get_contents($path . '/package.json'), true);
+                    $packageJsonContent = file_get_contents($path . '/package.json');
+                    if ($packageJsonContent === false) {
+                        continue;
+                    }
+                    $packageJson = json_decode($packageJsonContent, true);
+                    if (! is_array($packageJson)) {
+                        continue;
+                    }
 
                     $workspaces[] = [
                         'name' => $name,
@@ -275,7 +290,16 @@ trait InteractsWithMonorepo
 
         $composerJson = $workspace['path'] . '/composer.json';
 
-        return json_decode(file_get_contents($composerJson), true);
+        $content = file_get_contents($composerJson);
+        if ($content === false) {
+            return null;
+        }
+        $data = json_decode($content, true);
+        if (! is_array($data)) {
+            return null;
+        }
+
+        return $data;
     }
 
     /**
@@ -297,6 +321,15 @@ trait InteractsWithMonorepo
 
         $packageJson = $workspace['path'] . '/package.json';
 
-        return json_decode(file_get_contents($packageJson), true);
+        $content = file_get_contents($packageJson);
+        if ($content === false) {
+            return null;
+        }
+        $data = json_decode($content, true);
+        if (! is_array($data)) {
+            return null;
+        }
+
+        return $data;
     }
 }
