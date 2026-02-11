@@ -111,7 +111,7 @@ abstract class AbstractAppType implements AppTypeInterface
     protected function askText(string $label, string $placeholder = '', ?string $default = null, bool $required = true): string
     {
         // In non-interactive mode, return default value
-        if ($this->input !== null && !$this->input->isInteractive()) {
+        if (! $this->input->isInteractive()) {
             return $default ?? '';
         }
 
@@ -146,7 +146,7 @@ abstract class AbstractAppType implements AppTypeInterface
     protected function askConfirm(string $label, bool $default = true): bool
     {
         // In non-interactive mode, return default value
-        if ($this->input !== null && !$this->input->isInteractive()) {
+        if (! $this->input->isInteractive()) {
             return $default;
         }
 
@@ -186,7 +186,7 @@ abstract class AbstractAppType implements AppTypeInterface
     protected function askSelect(string $label, array $options, ?string $default = null): string
     {
         // In non-interactive mode, return default or first option
-        if ($this->input !== null && !$this->input->isInteractive()) {
+        if (! $this->input->isInteractive()) {
             return $default ?? (string) array_key_first($options);
         }
 

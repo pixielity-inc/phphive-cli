@@ -293,7 +293,7 @@ final class CreateAppCommand extends BaseCommand
         $process = Process::fromShellCommandline($command, $cwd, null, null, null);
 
         // Run the process and display output in real-time
-        $process->run(function ($type, $buffer) {
+        $process->run(function ($type, $buffer): void {
             echo $buffer;
         });
 

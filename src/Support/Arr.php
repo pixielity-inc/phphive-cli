@@ -462,6 +462,9 @@ final class Arr extends BaseArr
      * @param  array $array The input array.
      * @return bool  True if the array is a list, otherwise false.
      */
+    /**
+     * @param array<array-key, mixed> $array
+     */
     #[Override]
     public static function isList($array): bool
     {
