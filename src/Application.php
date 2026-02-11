@@ -278,7 +278,7 @@ final class Application extends BaseApplication
         }
 
         // Register command with Symfony Console
-        $this->add($command);
+        $this->addCommand($command);
     }
 
     /**
