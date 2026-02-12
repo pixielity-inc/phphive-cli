@@ -377,20 +377,41 @@ final class Application extends BaseApplication
         // Check for updates before displaying banner
         $this->checkForUpdates(self::APP_VERSION);
 
-        // ASCII art banner with ANSI color codes
-        // \e[36m = cyan, \e[33m = yellow, \e[90m = gray, \e[0m = reset
-        $banner = "\e[36m" . PHP_EOL
-            . '██████╗ ██╗  ██╗██████╗ ██╗  ██╗██╗██╗   ██╗███████╗' . PHP_EOL
-            . '██╔══██╗██║  ██║██╔══██╗██║  ██║██║██║   ██║██╔════╝' . PHP_EOL
-            . '██████╔╝███████║██████╔╝███████║██║██║   ██║█████╗  ' . PHP_EOL
-            . '██╔═══╝ ██╔══██║██╔═══╝ ██╔══██║██║╚██╗ ██╔╝██╔══╝  ' . PHP_EOL
-            . '██║     ██║  ██║██║     ██║  ██║██║ ╚████╔╝ ███████╗' . PHP_EOL
-            . '╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝' . PHP_EOL
-            . "\e[0m" . PHP_EOL
-            . "\e[33mPHP Monorepo Management powered by Turborepo\e[0m \e[90mv" . self::APP_VERSION . "\e[0m" . PHP_EOL
-            . PHP_EOL;
+        // ASCII art lines
+        $lines = [
+            '██████╗ ██╗  ██╗██████╗ ██╗  ██╗██╗██╗   ██╗███████╗',
+            '██╔══██╗██║  ██║██╔══██╗██║  ██║██║██║   ██║██╔════╝',
+            '██████╔╝███████║██████╔╝███████║██║██║   ██║█████╗  ',
+            '██╔═══╝ ██╔══██║██╔═══╝ ██╔══██║██║╚██╗ ██╔╝██╔══╝  ',
+            '██║     ██║  ██║██║     ██║  ██║██║ ╚████╔╝ ███████╗',
+            '╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝',
+        ];
 
-        echo $banner;
+        // Honey-themed gradients inspired by #F39C12 (Honey Gold)
+        $gradients = [
+            'Honey' => [214, 208, 202, 178, 172, 136],           // Warm honey gradient
+            'Amber' => [220, 214, 208, 202, 178, 172],           // Amber honey
+            'Golden' => [226, 220, 214, 208, 202, 178],          // Golden honey
+            'Sunset' => [214, 208, 202, 196, 160, 124],          // Sunset honey
+            'Caramel' => [180, 174, 168, 162, 136, 130],         // Caramel honey
+            'Wildflower' => [221, 215, 209, 203, 179, 173],      // Wildflower honey
+        ];
+
+        // Randomly select a gradient theme
+        $themeName = array_rand($gradients);
+        $gradient = $gradients[$themeName];
+
+        // Display banner with gradient
+        echo PHP_EOL;
+        foreach ($lines as $index => $line) {
+            $color = $gradient[$index];
+            echo "\e[38;5;{$color}m{$line}\e[0m" . PHP_EOL;
+        }
+
+        // Display tagline and version
+        echo PHP_EOL;
+        echo "\e[38;5;214mPHP Monorepo Management powered by Turborepo\e[0m \e[90mv" . self::APP_VERSION . "\e[0m" . PHP_EOL;
+        echo PHP_EOL;
 
         // Mark banner as displayed
         self::$bannerDisplayed = true;
