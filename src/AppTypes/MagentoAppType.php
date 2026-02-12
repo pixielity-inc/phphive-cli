@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\AppTypes;
 
-use function Laravel\Prompts\note;
-
 use PhpHive\Cli\Concerns\InteractsWithDatabase;
 use PhpHive\Cli\Concerns\InteractsWithDocker;
 use PhpHive\Cli\Concerns\InteractsWithElasticsearch;
+use PhpHive\Cli\Concerns\InteractsWithMagentoMarketplace;
 use PhpHive\Cli\Concerns\InteractsWithMeilisearch;
 use PhpHive\Cli\Concerns\InteractsWithMinio;
 use PhpHive\Cli\Concerns\InteractsWithRedis;
 use PhpHive\Cli\Support\Process;
+use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -104,6 +104,7 @@ class MagentoAppType extends AbstractAppType
     use InteractsWithDatabase;
     use InteractsWithDocker;
     use InteractsWithElasticsearch;
+    use InteractsWithMagentoMarketplace;
     use InteractsWithMeilisearch;
     use InteractsWithMinio;
     use InteractsWithRedis;
@@ -196,7 +197,7 @@ class MagentoAppType extends AbstractAppType
         $config['name'] = $input->getArgument('name');
 
         // Application description - from option or prompt
-        $config['description'] = $input->getOption('description') ?? $this->askText(
+        $config['description'] = $input->getOption('description') ?? $this->text(
             label: 'Application description',
             placeholder: 'A Magento e-commerce store',
             required: false
@@ -206,39 +207,32 @@ class MagentoAppType extends AbstractAppType
         // MAGENTO AUTHENTICATION
         // =====================================================================
 
-        // Check if keys provided via options
-        $publicKey = $input->getOption('magento-public-key');
-        $privateKey = $input->getOption('magento-private-key');
-
-        if ($publicKey === null || $privateKey === null) {
-            // Magento requires authentication keys from repo.magento.com
-            note('Get your keys from: https://marketplace.magento.com/customer/accessKeys/', 'Magento Authentication Keys');
-        }
-
-        // Public key (username)
-        $config['magento_public_key'] = $publicKey ?? $this->askText(
-            label: 'Magento Public Key (username)',
-            placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-            required: true
-        );
-
-        // Private key (password) - masked input for security
-        $config['magento_private_key'] = $privateKey ?? $this->askPassword(
-            label: 'Magento Private Key (password)',
-            placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-            required: true
-        );
+        // Get Magento authentication keys using the concern
+        $keys = $this->getMagentoAuthKeys(required: true);
+        $config['magento_public_key'] = $keys['public_key'];
+        $config['magento_private_key'] = $keys['private_key'];
 
         // =====================================================================
-        // MAGENTO VERSION
+        // MAGENTO EDITION & VERSION
         // =====================================================================
+
+        // Magento edition selection (Community or Enterprise)
+        $config['magento_edition'] = $input->getOption('magento-edition') ?? $this->select(
+            label: 'Magento edition',
+            options: [
+                'community' => 'Community Edition (Open Source)',
+                'enterprise' => 'Enterprise Edition (Commerce)',
+            ],
+            default: 'community'
+        );
 
         // Magento version selection
-        $config['magento_version'] = $input->getOption('magento-version') ?? $this->askSelect(
+        $config['magento_version'] = $input->getOption('magento-version') ?? $this->select(
             label: 'Magento version',
             options: [
                 '2.4.7' => 'Magento 2.4.7 (Latest)',
                 '2.4.6' => 'Magento 2.4.6',
+                '2.4.5' => 'Magento 2.4.5',
             ],
             default: '2.4.7'
         );
@@ -297,7 +291,7 @@ class MagentoAppType extends AbstractAppType
         // =====================================================================
 
         // Admin first name
-        $config['admin_firstname'] = $input->getOption('admin-firstname') ?? $this->askText(
+        $config['admin_firstname'] = $input->getOption('admin-firstname') ?? $this->text(
             label: 'Admin first name',
             placeholder: 'Admin',
             default: 'Admin',
@@ -305,7 +299,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Admin last name
-        $config['admin_lastname'] = $input->getOption('admin-lastname') ?? $this->askText(
+        $config['admin_lastname'] = $input->getOption('admin-lastname') ?? $this->text(
             label: 'Admin last name',
             placeholder: 'User',
             default: 'User',
@@ -313,7 +307,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Admin email
-        $config['admin_email'] = $input->getOption('admin-email') ?? $this->askText(
+        $config['admin_email'] = $input->getOption('admin-email') ?? $this->text(
             label: 'Admin email',
             placeholder: 'admin@example.com',
             default: 'admin@example.com',
@@ -321,7 +315,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Admin username
-        $config['admin_user'] = $input->getOption('admin-user') ?? $this->askText(
+        $config['admin_user'] = $input->getOption('admin-user') ?? $this->text(
             label: 'Admin username',
             placeholder: 'admin',
             default: 'admin',
@@ -329,7 +323,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Admin password
-        $config['admin_password'] = $input->getOption('admin-password') ?? $this->askText(
+        $config['admin_password'] = $input->getOption('admin-password') ?? $this->text(
             label: 'Admin password (min 7 chars, must include letters and numbers)',
             placeholder: 'Admin123!',
             default: 'Admin123!',
@@ -341,7 +335,7 @@ class MagentoAppType extends AbstractAppType
         // =====================================================================
 
         // Base URL
-        $config['base_url'] = $input->getOption('base-url') ?? $this->askText(
+        $config['base_url'] = $input->getOption('base-url') ?? $this->text(
             label: 'Base URL',
             placeholder: 'http://localhost/',
             default: 'http://localhost/',
@@ -349,7 +343,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Language
-        $config['language'] = $input->getOption('language') ?? $this->askSelect(
+        $config['language'] = $input->getOption('language') ?? $this->select(
             label: 'Default language',
             options: [
                 'en_US' => 'English (United States)',
@@ -362,7 +356,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Currency
-        $config['currency'] = $input->getOption('currency') ?? $this->askSelect(
+        $config['currency'] = $input->getOption('currency') ?? $this->select(
             label: 'Default currency',
             options: [
                 'USD' => 'US Dollar (USD)',
@@ -373,7 +367,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Timezone
-        $config['timezone'] = $input->getOption('timezone') ?? $this->askSelect(
+        $config['timezone'] = $input->getOption('timezone') ?? $this->select(
             label: 'Default timezone',
             options: [
                 'America/New_York' => 'America/New_York (EST)',
@@ -391,7 +385,7 @@ class MagentoAppType extends AbstractAppType
 
         // Sample data - Demo products, categories, and content
         $sampleDataOption = $input->getOption('sample-data');
-        $config['install_sample_data'] = $sampleDataOption !== null ? (bool) $sampleDataOption : $this->askConfirm(
+        $config['install_sample_data'] = $sampleDataOption !== null ? (bool) $sampleDataOption : $this->confirm(
             label: 'Install sample data (demo products and content)?',
             default: false
         );
@@ -402,7 +396,7 @@ class MagentoAppType extends AbstractAppType
 
         // Check if Redis should be enabled (flag or prompt)
         $redisOption = $input->getOption('use-redis');
-        $config['use_redis'] = $redisOption !== null ? (bool) $redisOption : $this->askConfirm(
+        $config['use_redis'] = $redisOption !== null ? (bool) $redisOption : $this->confirm(
             label: 'Use Redis for caching and sessions?',
             default: true
         );
@@ -446,7 +440,7 @@ class MagentoAppType extends AbstractAppType
             $config['use_elasticsearch'] = false;
         } else {
             // Interactive mode - ask which search engine to use
-            $searchEngine = $this->askSelect(
+            $searchEngine = $this->select(
                 label: 'Select search engine',
                 options: [
                     'elasticsearch' => 'Elasticsearch (Recommended for Magento)',
@@ -495,7 +489,7 @@ class MagentoAppType extends AbstractAppType
 
         // Check if Minio should be enabled (flag or prompt)
         $minioOption = $input->getOption('use-minio');
-        $config['use_minio'] = $minioOption !== null ? (bool) $minioOption : $this->askConfirm(
+        $config['use_minio'] = $minioOption !== null ? (bool) $minioOption : $this->confirm(
             label: 'Use Minio for object storage (media files)?',
             default: false
         );
@@ -539,22 +533,34 @@ class MagentoAppType extends AbstractAppType
         // Extract Magento version from config, default to version 2.4.7
         $version = $config['magento_version'] ?? '2.4.7';
 
+        // Extract Magento edition from config, default to community
+        $edition = $config['magento_edition'] ?? 'community';
+
         // Extract authentication keys
         $publicKey = $config['magento_public_key'] ?? '';
         $privateKey = $config['magento_private_key'] ?? '';
 
-        // Create auth JSON for COMPOSER_AUTH environment variable
-        $authJson = json_encode([
-            'http-basic' => [
-                'repo.magento.com' => [
-                    'username' => $publicKey,
-                    'password' => $privateKey,
-                ],
-            ],
-        ], JSON_UNESCAPED_SLASHES);
+        // Validate that credentials are not empty
+        if ($publicKey === '' || $privateKey === '') {
+            throw new RuntimeException(
+                'Magento authentication keys are required. Get your keys from: https://marketplace.magento.com/customer/accessKeys/'
+            );
+        }
+
+        // Determine the package name based on edition
+        $packageName = $edition === 'enterprise'
+            ? 'magento/project-enterprise-edition'
+            : 'magento/project-community-edition';
+
+        // Get COMPOSER_AUTH JSON using the concern
+        $authJson = $this->getMagentoComposerAuth($publicKey, $privateKey);
+
+        // Add flags to handle compatibility issues:
+        // --ignore-platform-reqs: Allow installation on newer PHP versions
+        $flags = '--ignore-platform-reqs';
 
         // Return command with COMPOSER_AUTH environment variable
-        return "COMPOSER_AUTH='{$authJson}' composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition:{$version} .";
+        return "COMPOSER_AUTH='{$authJson}' composer create-project --repository-url=https://repo.magento.com/ {$packageName}:{$version} . {$flags}";
     }
 
     /**
@@ -604,6 +610,40 @@ class MagentoAppType extends AbstractAppType
     {
         // Initialize commands array
         $commands = [];
+
+        // =====================================================================
+        // MONOREPO PACKAGES SUPPORT
+        // =====================================================================
+
+        // Add Composer path repositories for monorepo packages
+        // This allows Magento to use local packages from the monorepo
+        $commands[] = 'composer config repositories.monorepo-packages path "../../../packages/*"';
+
+        // Update registration_globlist.php to include monorepo packages
+        // This allows Magento to auto-discover modules from the packages directory
+        $registrationGloblistPath = 'app/etc/registration_globlist.php';
+        $commands[] = "php -r \"\\\$file = '{$registrationGloblistPath}'; \\\$content = file_get_contents(\\\$file); \\\$content = str_replace('];', \"    '../../../packages/*/registration.php',\\n];\", \\\$content); file_put_contents(\\\$file, \\\$content);\"";
+
+        // =====================================================================
+        // INSTALL LARAVEL PINT FOR CODE FORMATTING
+        // =====================================================================
+
+        // Install Laravel Pint as a dev dependency for consistent code formatting
+        $commands[] = 'composer require laravel/pint --dev --no-interaction';
+
+        // =====================================================================
+        // CLEANUP UNNECESSARY FILES (BEFORE MAGENTO SETUP)
+        // =====================================================================
+
+        // Remove all .sample files after installation
+        // Magento includes many .sample configuration files that should be removed
+        $commands[] = 'find . -name "*.sample" -type f -delete';
+
+        // Remove unnecessary Magento files that are not needed in monorepo
+        $commands[] = 'rm -rf app/design';  // Remove default themes (use custom themes in packages)
+        $commands[] = 'rm -f COPYING.txt LICENSE_AFL.txt LICENSE.txt';  // Remove license files
+        $commands[] = 'rm -f CHANGELOG.md SECURITY.md';  // Remove changelog and security files
+        $commands[] = 'rm -f .php-cs-fixer.dist.php';  // Remove php-cs-fixer in favor of Pint
 
         // =====================================================================
         // FILE PERMISSIONS
@@ -769,12 +809,12 @@ class MagentoAppType extends AbstractAppType
      * The stub files contain placeholders (e.g., {{APP_NAME}}) that are
      * replaced with actual values using getStubVariables().
      *
-     * @return string Absolute path to cli/stubs/magento-app directory
+     * @return string Absolute path to cli/stubs/apps/magento directory
      */
     public function getStubPath(): string
     {
-        // Get base stubs directory and append magento-app subdirectory
-        return $this->getBaseStubPath() . '/magento-app';
+        // Get base stubs directory and append apps/magento subdirectory
+        return $this->getBaseStubPath() . '/apps/magento';
     }
 
     /**

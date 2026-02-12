@@ -119,7 +119,7 @@ final class AppTypeFactory
      * Get app type choices for interactive prompts.
      *
      * Returns an associative array suitable for use with Laravel Prompts
-     * select() function. The array maps display labels to app type identifiers.
+     * $this->select() function. The array maps display labels to app type identifiers.
      *
      * Format: ['Display Name (Description)' => 'identifier']
      *
@@ -135,7 +135,7 @@ final class AppTypeFactory
      *
      * Example usage:
      * ```php
-     * $type = select(
+     * $type = $this->select(
      *     label: 'Select application type',
      *     options: AppTypeFactory::getChoices()
      * );

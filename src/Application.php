@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace PhpHive\Cli;
 
 use function in_array;
-use function Laravel\Prompts\clear;
-use function Laravel\Prompts\select;
 
 use Override;
 
@@ -14,6 +12,7 @@ use const PHP_SAPI;
 
 use PhpHive\Cli\Concerns\ChecksForUpdates;
 use PhpHive\Cli\Concerns\HasDiscovery;
+use PhpHive\Cli\Concerns\InteractsWithPrompts;
 use PhpHive\Cli\Support\Composer;
 use PhpHive\Cli\Support\Container;
 use PhpHive\Cli\Support\Docker;
@@ -58,6 +57,7 @@ final class Application extends BaseApplication
 {
     use ChecksForUpdates;
     use HasDiscovery;
+    use InteractsWithPrompts;
 
     /**
      * Application name displayed in banner and version output.
@@ -248,7 +248,7 @@ final class Application extends BaseApplication
                 // Use Laravel Prompts for interactive selection
                 $this->displayBanner();
 
-                $selected = select(
+                $selected = $this->select(
                     label: "Command \"{$name}\" is not defined. Did you mean one of these?",
                     options: array_combine($alternatives, $alternatives),
                     default: $alternatives[0] ?? null,
@@ -412,7 +412,7 @@ final class Application extends BaseApplication
     private function displayBanner(): void
     {
         // Clear terminal for clean presentation
-        clear();
+        $this->clear();
 
         // Only show banner once per process
         if (self::$bannerDisplayed) {

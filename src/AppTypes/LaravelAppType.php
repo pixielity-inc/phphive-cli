@@ -113,14 +113,14 @@ class LaravelAppType extends AbstractAppType
         // =====================================================================
 
         // Application name - used for directory name, package name, and namespace
-        $config['name'] = $this->askText(
+        $config['name'] = $this->text(
             label: 'Application name',
             placeholder: 'my-app',
             required: true
         );
 
         // Application description - used in composer.json and documentation
-        $config['description'] = $this->askText(
+        $config['description'] = $this->text(
             label: 'Application description',
             placeholder: 'A Laravel application',
             required: false
@@ -134,7 +134,7 @@ class LaravelAppType extends AbstractAppType
         // - Version 12: Latest features and improvements
         // - Version 11: Long-term support (LTS) with extended maintenance
         // - Version 10: Previous stable version
-        $config['laravel_version'] = $this->askSelect(
+        $config['laravel_version'] = $this->select(
             label: 'Laravel version',
             options: [
                 'v12' => 'Laravel 12 (Latest)',
@@ -145,7 +145,7 @@ class LaravelAppType extends AbstractAppType
         );
 
         // Extract version number (remove 'v' prefix)
-        $config['laravel_version'] = ltrim($config['laravel_version'], 'v');
+        $config['laravel_version'] = ltrim((string) $config['laravel_version'], 'v');
 
         // =====================================================================
         // STARTER KIT
@@ -155,7 +155,7 @@ class LaravelAppType extends AbstractAppType
         // - None: No authentication scaffolding
         // - Breeze: Minimal authentication with Blade or Inertia
         // - Jetstream: Full-featured with teams, 2FA, and profile management
-        $config['starter_kit'] = $this->askSelect(
+        $config['starter_kit'] = $this->select(
             label: 'Starter kit',
             options: [
                 'none' => 'None',
@@ -171,7 +171,7 @@ class LaravelAppType extends AbstractAppType
 
         // Database driver selection
         // Determines the default database connection in config/database.php
-        $config['database'] = $this->askSelect(
+        $config['database'] = $this->select(
             label: 'Database driver',
             options: [
                 'mysql' => 'MySQL',
@@ -188,28 +188,28 @@ class LaravelAppType extends AbstractAppType
 
         // Laravel Horizon - Queue monitoring dashboard
         // Provides a beautiful dashboard and code-driven configuration for Redis queues
-        $config['install_horizon'] = $this->askConfirm(
+        $config['install_horizon'] = $this->confirm(
             label: 'Install Laravel Horizon (Queue monitoring)?',
             default: false
         );
 
         // Laravel Telescope - Debugging and insight tool
         // Provides insight into requests, exceptions, database queries, queued jobs, etc.
-        $config['install_telescope'] = $this->askConfirm(
+        $config['install_telescope'] = $this->confirm(
             label: 'Install Laravel Telescope (Debugging)?',
             default: false
         );
 
         // Laravel Sanctum - API authentication
         // Provides a simple token-based authentication system for SPAs and mobile apps
-        $config['install_sanctum'] = $this->askConfirm(
+        $config['install_sanctum'] = $this->confirm(
             label: 'Install Laravel Sanctum (API authentication)?',
             default: true
         );
 
         // Laravel Octane - High-performance application server
         // Supercharges application performance using Swoole or RoadRunner
-        $config['install_octane'] = $this->askConfirm(
+        $config['install_octane'] = $this->confirm(
             label: 'Install Laravel Octane (High-performance server)?',
             default: false
         );
@@ -271,6 +271,26 @@ class LaravelAppType extends AbstractAppType
             // Generate application encryption key (required for Laravel)
             'php artisan key:generate',
         ];
+
+        // =====================================================================
+        // MONOREPO MODULES SUPPORT
+        // =====================================================================
+
+        // Install Laravel Modules package for modular development
+        // This allows the app to load modules from the monorepo packages directory
+        $commands[] = 'composer require nwidart/laravel-modules';
+
+        // Publish the modules configuration file
+        $commands[] = 'php artisan vendor:publish --provider="Nwidart\Modules\LaravelModulesServiceProvider"';
+
+        // Update the modules config to scan the monorepo packages directory
+        // This allows modules to be shared across multiple Laravel apps in the monorepo
+        $commands[] = 'php -r "' .
+            '$config = file_get_contents(\'config/modules.php\'); ' .
+            '$config = preg_replace(\'/\'paths\' => \[.*?\]/s\', ' .
+            '\'\\\'paths\\\' => [\\n        \\\'modules\\\' => base_path(\\\'modules\\\'),\\n        ' .
+            '\\\'packages\\\' => base_path(\\\'../../../packages\\\'),\\n    ]\', $config); ' .
+            'file_put_contents(\'config/modules.php\', $config);"';
 
         // =====================================================================
         // STARTER KIT INSTALLATION
@@ -354,12 +374,12 @@ class LaravelAppType extends AbstractAppType
      * The stub files contain placeholders (e.g., {{APP_NAME}}) that are
      * replaced with actual values using getStubVariables().
      *
-     * @return string Absolute path to cli/stubs/laravel-app directory
+     * @return string Absolute path to cli/stubs/apps/laravel directory
      */
     public function getStubPath(): string
     {
-        // Get base stubs directory and append laravel-app subdirectory
-        return $this->getBaseStubPath() . '/laravel-app';
+        // Get base stubs directory and append apps/laravel subdirectory
+        return $this->getBaseStubPath() . '/apps/laravel';
     }
 
     /**

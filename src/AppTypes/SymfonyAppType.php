@@ -118,14 +118,14 @@ class SymfonyAppType extends AbstractAppType
         // =====================================================================
 
         // Application name - used for directory name, package name, and namespace
-        $config['name'] = $this->askText(
+        $config['name'] = $this->text(
             label: 'Application name',
             placeholder: 'my-app',
             required: true
         );
 
         // Application description - used in composer.json and documentation
-        $config['description'] = $this->askText(
+        $config['description'] = $this->text(
             label: 'Application description',
             placeholder: 'A Symfony application',
             required: false
@@ -139,7 +139,7 @@ class SymfonyAppType extends AbstractAppType
         // - Version 7.1: Long-term support (LTS) with extended maintenance
         // - Version 7.0: Latest stable version
         // - Version 6.4: Previous LTS version for legacy compatibility
-        $config['symfony_version'] = $this->askSelect(
+        $config['symfony_version'] = $this->select(
             label: 'Symfony version',
             options: [
                 '7.1' => 'Symfony 7.1 (LTS)',
@@ -156,7 +156,7 @@ class SymfonyAppType extends AbstractAppType
         // Project type selection determines which packages to install
         // - webapp: Installs symfony/webapp-pack for full-featured application
         // - skeleton: Minimal with only HTTP kernel and routing
-        $config['project_type'] = $this->askSelect(
+        $config['project_type'] = $this->select(
             label: 'Project type',
             options: [
                 'webapp' => 'Web Application (Full-featured)',
@@ -171,7 +171,7 @@ class SymfonyAppType extends AbstractAppType
 
         // Database driver selection
         // Determines the default database connection in config/packages/doctrine.yaml
-        $config['database'] = $this->askSelect(
+        $config['database'] = $this->select(
             label: 'Database driver',
             options: [
                 'mysql' => 'MySQL',
@@ -187,14 +187,14 @@ class SymfonyAppType extends AbstractAppType
 
         // Symfony Maker Bundle - Code generation tool
         // Provides console commands to generate controllers, entities, forms, etc.
-        $config['install_maker'] = $this->askConfirm(
+        $config['install_maker'] = $this->confirm(
             label: 'Install Symfony Maker Bundle (Code generation)?',
             default: true
         );
 
         // Symfony Security Bundle - Authentication and authorization
         // Provides user authentication, authorization, and security features
-        $config['install_security'] = $this->askConfirm(
+        $config['install_security'] = $this->confirm(
             label: 'Install Security Bundle (Authentication)?',
             default: true
         );
@@ -318,12 +318,12 @@ class SymfonyAppType extends AbstractAppType
      * The stub files contain placeholders (e.g., {{APP_NAME}}) that are
      * replaced with actual values using getStubVariables().
      *
-     * @return string Absolute path to cli/stubs/symfony-app directory
+     * @return string Absolute path to cli/stubs/apps/symfony directory
      */
     public function getStubPath(): string
     {
-        // Get base stubs directory and append symfony-app subdirectory
-        return $this->getBaseStubPath() . '/symfony-app';
+        // Get base stubs directory and append apps/symfony subdirectory
+        return $this->getBaseStubPath() . '/apps/symfony';
     }
 
     /**

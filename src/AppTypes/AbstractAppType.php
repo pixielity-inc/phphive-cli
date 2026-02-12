@@ -4,12 +4,7 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\AppTypes;
 
-use function array_key_first;
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\password;
-use function Laravel\Prompts\select;
-use function Laravel\Prompts\text;
-
+use PhpHive\Cli\Concerns\InteractsWithPrompts;
 use PhpHive\Cli\Contracts\AppTypeInterface;
 use PhpHive\Cli\Support\Filesystem;
 use Symfony\Component\Console\Input\InputInterface;
@@ -43,8 +38,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * ```php
  * class MyAppType extends AbstractAppType {
  *     public function collectConfiguration(...) {
- *         $name = $this->askText('App name', 'my-app');
- *         $useDb = $this->askConfirm('Use database?');
+ *         $name = $this->text('App name', 'my-app');
+ *         $useDb = $this->confirm('Use database?');
  *
  *         // Use Filesystem for file operations
  *         if ($this->filesystem()->exists('/path/to/config')) {
@@ -61,6 +56,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 abstract class AbstractAppType implements AppTypeInterface
 {
+    use InteractsWithPrompts;
+
     /**
      * Filesystem instance for file operations.
      *
@@ -161,160 +158,6 @@ abstract class AbstractAppType implements AppTypeInterface
     {
         // Go up two directories from src/AppTypes to reach cli root, then into stubs
         return dirname(__DIR__, 2) . '/stubs';
-    }
-
-    /**
-     * Ask a text input question with validation.
-     *
-     * Displays an interactive text input prompt using Laravel Prompts.
-     * Supports placeholders, default values, and required validation.
-     *
-     * In non-interactive mode (--no-interaction flag), returns the default value
-     * or an empty string if no default is provided.
-     *
-     * Example usage:
-     * ```php
-     * $name = $this->askText(
-     *     label: 'Application name',
-     *     placeholder: 'my-awesome-app',
-     *     default: 'app',
-     *     required: true
-     * );
-     * ```
-     *
-     * @param  string      $label       The question label to display
-     * @param  string      $placeholder Placeholder text shown in the input field
-     * @param  string|null $default     Default value if user presses enter without input
-     * @param  bool        $required    Whether the input is required (cannot be empty)
-     * @return string      The user's input value
-     */
-    protected function askText(string $label, string $placeholder = '', ?string $default = null, bool $required = true): string
-    {
-        // In non-interactive mode, return default value
-        if (! $this->input->isInteractive()) {
-            return $default ?? '';
-        }
-
-        return text(
-            label: $label,
-            placeholder: $placeholder,
-            default: $default ?? '',
-            required: $required
-        );
-    }
-
-    /**
-     * Ask a password input question with masking.
-     *
-     * Displays an interactive password input prompt using Laravel Prompts.
-     * Characters are masked as they're typed for security.
-     *
-     * In non-interactive mode (--no-interaction flag), returns the default value
-     * or an empty string if no default is provided.
-     *
-     * Example usage:
-     * ```php
-     * $apiKey = $this->askPassword(
-     *     label: 'API Key',
-     *     placeholder: 'Enter your secret key',
-     *     required: true
-     * );
-     * ```
-     *
-     * @param  string      $label       The question label to display
-     * @param  string      $placeholder Placeholder text shown in the input field
-     * @param  string|null $default     Default value if user presses enter without input
-     * @param  bool        $required    Whether the input is required (cannot be empty)
-     * @return string      The user's input value
-     */
-    protected function askPassword(string $label, string $placeholder = '', ?string $default = null, bool $required = true): string
-    {
-        // In non-interactive mode, return default value
-        if (! $this->input->isInteractive()) {
-            return $default ?? '';
-        }
-
-        return password(
-            label: $label,
-            placeholder: $placeholder,
-            required: $required
-        );
-    }
-
-    /**
-     * Ask a yes/no confirmation question.
-     *
-     * Displays an interactive confirmation prompt using Laravel Prompts.
-     * The user can answer with yes/no, y/n, or press enter for the default.
-     *
-     * In non-interactive mode (--no-interaction flag), returns the default value.
-     *
-     * Example usage:
-     * ```php
-     * $installTests = $this->askConfirm(
-     *     label: 'Install PHPUnit for testing?',
-     *     default: true
-     * );
-     * ```
-     *
-     * @param  string $label   The question label to display
-     * @param  bool   $default Default value (true = yes, false = no)
-     * @return bool   True if user confirmed, false otherwise
-     */
-    protected function askConfirm(string $label, bool $default = true): bool
-    {
-        // In non-interactive mode, return default value
-        if (! $this->input->isInteractive()) {
-            return $default;
-        }
-
-        return confirm(
-            label: $label,
-            default: $default
-        );
-    }
-
-    /**
-     * Ask a multiple-choice selection question.
-     *
-     * Displays an interactive selection menu using Laravel Prompts.
-     * The user can navigate options with arrow keys and select with enter.
-     *
-     * In non-interactive mode (--no-interaction flag), returns the default value
-     * or the first option if no default is provided.
-     *
-     * Example usage:
-     * ```php
-     * $version = $this->askSelect(
-     *     label: 'PHP version',
-     *     options: [
-     *         '8.3' => 'PHP 8.3 (Recommended)',
-     *         '8.2' => 'PHP 8.2',
-     *         '8.1' => 'PHP 8.1',
-     *     ],
-     *     default: '8.3'
-     * );
-     * ```
-     *
-     * @param  string                $label   The question label to display
-     * @param  array<string, string> $options Associative array of value => label pairs
-     * @param  string|null           $default Default selected value (must be a key in $options)
-     * @return string                The selected option's key
-     */
-    protected function askSelect(string $label, array $options, ?string $default = null): string
-    {
-        // In non-interactive mode, return default or first option
-        if (! $this->input->isInteractive()) {
-            return $default ?? (string) array_key_first($options);
-        }
-
-        $result = select(
-            label: $label,
-            options: $options,
-            default: $default
-        );
-
-        return (string) $result;
     }
 
     /**
@@ -421,18 +264,36 @@ abstract class AbstractAppType implements AppTypeInterface
         return [
             // Original name as entered by user
             '{{APP_NAME}}' => $appName,
-
             // Normalized name for directories and package names (lowercase, hyphenated)
             '{{APP_NAME_NORMALIZED}}' => $normalizedName,
-
             // PascalCase namespace component for PHP classes
             '{{APP_NAMESPACE}}' => $this->nameToNamespace($appName),
-
             // Full Composer package name following phphive/* convention
             '{{PACKAGE_NAME}}' => "phphive/{$normalizedName}",
-
             // Application description from config or generated default
             '{{DESCRIPTION}}' => $config['description'] ?? "Application: {$appName}",
         ];
+    }
+
+    /**
+     * Get the Composer service instance.
+     *
+     * Returns a Composer service instance for performing composer operations.
+     * This method creates a new instance each time it's called.
+     *
+     * Example usage:
+     * ```php
+     * // Install dependencies
+     * $this->composerService()->install('/path/to/project');
+     *
+     * // Require a package
+     * $this->composerService()->require('/path/to/project', 'symfony/console');
+     * ```
+     *
+     * @return \PhpHive\Cli\Support\Composer The Composer service instance
+     */
+    protected function composerService(): \PhpHive\Cli\Support\Composer
+    {
+        return \PhpHive\Cli\Support\Composer::make();
     }
 }

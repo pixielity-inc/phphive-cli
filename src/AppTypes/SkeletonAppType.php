@@ -24,7 +24,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - Learning projects and prototypes
  *
  * Features supported:
- * - Configurable minimum PHP version (8.2, 8.3, 8.4, 8.5)
+ * - Configurable minimum PHP version (8.2, 8.4, 8.5)
  * - Optional PHPUnit for testing
  * - Optional quality tools (PHPStan, Pint)
  * - PSR-4 autoloading configuration
@@ -90,7 +90,7 @@ class SkeletonAppType extends AbstractAppType
      *
      * Configuration collected:
      * - Application name and description
-     * - Minimum PHP version (8.2, 8.3, 8.4, 8.5)
+     * - Minimum PHP version (8.2, 8.4, 8.5)
      * - Whether to include PHPUnit for testing
      * - Whether to include quality tools (PHPStan, Pint)
      *
@@ -117,7 +117,7 @@ class SkeletonAppType extends AbstractAppType
         // =====================================================================
 
         // Application name - used for directory name, package name, and namespace
-        $config['name'] = $this->askText(
+        $config['name'] = $this->text(
             label: 'Application name',
             placeholder: 'my-app',
             default: 'my-app',
@@ -125,7 +125,7 @@ class SkeletonAppType extends AbstractAppType
         );
 
         // Application description - used in composer.json and documentation
-        $config['description'] = $this->askText(
+        $config['description'] = $this->text(
             label: 'Application description',
             placeholder: 'A PHP application',
             default: 'A PHP application',
@@ -139,7 +139,7 @@ class SkeletonAppType extends AbstractAppType
         // Minimum PHP version requirement
         // This determines the "require.php" constraint in composer.json
         // and affects which language features can be used
-        $config['php_version'] = $this->askSelect(
+        $config['php_version'] = $this->select(
             label: 'Minimum PHP version',
             options: [
                 '8.5' => 'PHP 8.5',
@@ -156,14 +156,14 @@ class SkeletonAppType extends AbstractAppType
 
         // PHPUnit - Unit testing framework
         // Includes PHPUnit in require-dev and creates tests/ directory
-        $config['include_tests'] = $this->askConfirm(
+        $config['include_tests'] = $this->confirm(
             label: 'Include PHPUnit for testing?',
             default: true
         );
 
         // Quality tools - Static analysis and code formatting
         // Includes PHPStan (static analysis) and Pint (code formatting)
-        $config['include_quality_tools'] = $this->askConfirm(
+        $config['include_quality_tools'] = $this->confirm(
             label: 'Include quality tools (PHPStan, Pint)?',
             default: true
         );
@@ -247,12 +247,12 @@ class SkeletonAppType extends AbstractAppType
      * The stub files contain placeholders (e.g., {{APP_NAME}}) that are
      * replaced with actual values using getStubVariables().
      *
-     * @return string Absolute path to cli/stubs/skeleton-app directory
+     * @return string Absolute path to cli/stubs/apps/skeleton directory
      */
     public function getStubPath(): string
     {
-        // Get base stubs directory and append skeleton-app subdirectory
-        return $this->getBaseStubPath() . '/skeleton-app';
+        // Get base stubs directory and append apps/skeleton subdirectory
+        return $this->getBaseStubPath() . '/apps/skeleton';
     }
 
     /**
@@ -270,7 +270,7 @@ class SkeletonAppType extends AbstractAppType
      * - {{DESCRIPTION}}: Application description
      *
      * Skeleton-specific variables:
-     * - {{PHP_VERSION}}: Selected minimum PHP version (8.2, 8.3, 8.4, 8.5)
+     * - {{PHP_VERSION}}: Selected minimum PHP version (8.2, 8.4, 8.5)
      *
      * Example stub usage:
      * ```json
