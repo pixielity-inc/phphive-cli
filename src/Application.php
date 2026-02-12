@@ -12,6 +12,7 @@ use Override;
 
 use const PHP_SAPI;
 
+use PhpHive\Cli\Concerns\ChecksForUpdates;
 use PhpHive\Cli\Concerns\HasDiscovery;
 use PhpHive\Cli\Support\Container;
 use PhpHive\Cli\Support\Reflection;
@@ -51,6 +52,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 final class Application extends BaseApplication
 {
+    use ChecksForUpdates;
     use HasDiscovery;
 
     /**
@@ -349,6 +351,8 @@ final class Application extends BaseApplication
      *
      * The terminal is cleared before displaying the banner for a clean
      * presentation.
+     *
+     * Also checks for available updates and displays notification if found.
      */
     private function displayBanner(): void
     {
@@ -369,6 +373,9 @@ final class Application extends BaseApplication
         if (isset($_SERVER['argv'][1]) && in_array($_SERVER['argv'][1], ['help', 'list', '--help', '-h', '--version', '-V'], true)) {
             return;
         }
+
+        // Check for updates before displaying banner
+        $this->checkForUpdates(self::APP_VERSION);
 
         // ASCII art banner with ANSI color codes
         // \e[36m = cyan, \e[33m = yellow, \e[90m = gray, \e[0m = reset
