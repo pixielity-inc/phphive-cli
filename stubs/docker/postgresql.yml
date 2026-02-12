@@ -14,24 +14,24 @@
 #   PostgreSQL: localhost:5432
 #   Adminer: http://localhost:8080
 
-version: '3.8'
+version: "3.8"
 
 services:
   # PostgreSQL Database Service
   postgres:
     image: postgres:15-alpine
-    container_name: {{CONTAINER_PREFIX}}-postgres
+    container_name: "{{CONTAINER_PREFIX}}-postgres"
     restart: unless-stopped
     environment:
-      POSTGRES_DB: {{DB_NAME}}
-      POSTGRES_USER: {{DB_USER}}
-      POSTGRES_PASSWORD: {{DB_PASSWORD}}
+      POSTGRES_DB: "{{DB_NAME}}"
+      POSTGRES_USER: "{{DB_USER}}"
+      POSTGRES_PASSWORD: "{{DB_PASSWORD}}"
     ports:
       - "{{DB_PORT}}:5432"
     volumes:
-      - {{VOLUME_PREFIX}}-postgres-data:/var/lib/postgresql/data
+      - "{{VOLUME_PREFIX}}-postgres-data:/var/lib/postgresql/data"
     networks:
-      - {{NETWORK_NAME}}
+      - "{{NETWORK_NAME}}"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U {{DB_USER}}"]
       interval: 10s
@@ -41,23 +41,23 @@ services:
   # Adminer Service (Optional)
   adminer:
     image: adminer:latest
-    container_name: {{CONTAINER_PREFIX}}-adminer
+    container_name: "{{CONTAINER_PREFIX}}-adminer"
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: postgres
     ports:
       - "{{ADMINER_PORT}}:8080"
     networks:
-      - {{NETWORK_NAME}}
+      - "{{NETWORK_NAME}}"
     depends_on:
       - postgres
 
 # Named volumes for data persistence
 volumes:
-  {{VOLUME_PREFIX}}-postgres-data:
+  "{{VOLUME_PREFIX}}-postgres-data":
     driver: local
 
 # Network for service communication
 networks:
-  {{NETWORK_NAME}}:
+  "{{NETWORK_NAME}}":
     driver: bridge
