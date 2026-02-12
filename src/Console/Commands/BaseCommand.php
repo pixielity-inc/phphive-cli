@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands;
 
-use function array_filter;
-use function array_map;
-use function count;
-use function explode;
 use function in_array;
 use function json_encode;
 
@@ -22,7 +18,6 @@ use PhpHive\Cli\Concerns\InteractsWithTurborepo;
 use PhpHive\Cli\Support\Container;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -379,181 +374,6 @@ abstract class BaseCommand extends Command
     }
 
     /**
-     * Select a single workspace interactively or from option.
-     *
-     * This method provides a unified way to get a workspace selection from the user.
-     * It first checks if a workspace was specified via the --workspace option.
-     * If not, it prompts the user to select from available workspaces interactively.
-     *
-     * The method uses Laravel Prompts for a beautiful interactive selection experience
-     * when running in interactive mode. In non-interactive mode, it will return the
-     * first available workspace if no workspace option was provided.
-     *
-     * Example:
-     * ```php
-     * $workspace = $this->selectWorkspace('Which workspace to install?');
-     * $this->info("Installing in {$workspace}...");
-     * ```
-     *
-     * @param  string $prompt The prompt message to display to the user
-     * @return string The selected workspace name
-     */
-    protected function selectWorkspace(string $prompt = 'Select workspace'): string
-    {
-        // Check if workspace was specified via --workspace option
-        $workspace = $this->option('workspace');
-        if (is_string($workspace) && $workspace !== '' && $workspace !== '0') {
-            return $workspace;
-        }
-
-        // Get all available workspaces
-        $workspaces = $this->getAllWorkspaces();
-
-        // If no workspaces available, throw an exception
-        if ($workspaces === []) {
-            throw new RuntimeException('No workspaces found in the monorepo.');
-        }
-
-        // If only one workspace exists, return it automatically
-        if (count($workspaces) === 1) {
-            return $workspaces[0];
-        }
-
-        // In non-interactive mode, return the first workspace
-        if ($this->option('no-interaction') === true) {
-            return $workspaces[0];
-        }
-
-        // Use interactive prompt to select workspace
-        return (string) $this->select($prompt, $workspaces);
-    }
-
-    /**
-     * Select multiple workspaces interactively or from option.
-     *
-     * This method allows users to select one or more workspaces either via
-     * the --workspace option (comma-separated) or through an interactive
-     * multi-select prompt.
-     *
-     * The method handles several scenarios:
-     * - If --all flag is set, returns all available workspaces
-     * - If --workspace option is provided, parses comma-separated values
-     * - Otherwise, prompts user for interactive multi-selection
-     *
-     * Example:
-     * ```php
-     * $workspaces = $this->selectWorkspaces('Select workspaces to test');
-     * foreach ($workspaces as $workspace) {
-     *     $this->info("Testing {$workspace}...");
-     * }
-     * ```
-     *
-     * @param  string        $prompt The prompt message to display to the user
-     * @return array<string> Array of selected workspace names
-     */
-    protected function selectWorkspaces(string $prompt = 'Select workspaces'): array
-    {
-        // If --all flag is set, return all workspaces
-        if ($this->shouldRunOnAll()) {
-            return $this->getAllWorkspaces();
-        }
-
-        // Check if workspace(s) were specified via --workspace option
-        $workspace = $this->option('workspace');
-        if (is_string($workspace) && $workspace !== '' && $workspace !== '0') {
-            // Split by comma to support multiple workspaces
-            $workspaces = array_map(trim(...), explode(',', $workspace));
-
-            return array_values(array_filter($workspaces, static fn ($w): bool => $w !== '' && $w !== '0'));
-        }
-
-        // Get all available workspaces
-        $allWorkspaces = $this->getAllWorkspaces();
-
-        // If no workspaces available, throw an exception
-        if ($allWorkspaces === []) {
-            throw new RuntimeException('No workspaces found in the monorepo.');
-        }
-
-        // In non-interactive mode, return all workspaces
-        if ($this->option('no-interaction') === true) {
-            return $allWorkspaces;
-        }
-
-        // Use interactive multi-select prompt
-        $selected = $this->multiselect($prompt, $allWorkspaces);
-
-        // Ensure all values are strings
-        return array_map(strval(...), $selected);
-    }
-
-    /**
-     * Get all available workspaces in the monorepo.
-     *
-     * This method discovers and returns all workspace names defined in the
-     * monorepo configuration. It uses the InteractsWithMonorepo trait's
-     * getWorkspaces() method to fetch workspace information, then extracts
-     * just the workspace names.
-     *
-     * The returned array contains workspace names as strings, suitable for
-     * use in prompts, iteration, or filtering operations.
-     *
-     * Example:
-     * ```php
-     * $workspaces = $this->getAllWorkspaces();
-     * $this->info('Found ' . count($workspaces) . ' workspaces');
-     * ```
-     *
-     * @return array<string> Array of workspace names
-     */
-    protected function getAllWorkspaces(): array
-    {
-        // Get workspace information from monorepo configuration
-        $workspaces = $this->getWorkspaces();
-
-        // Extract and return just the workspace names
-        return array_map(
-            static fn (array $workspace): string => $workspace['name'],
-            $workspaces
-        );
-    }
-
-    /**
-     * Check if command should run on all workspaces.
-     *
-     * This method determines whether the command should be executed across
-     * all available workspaces. It returns true in two scenarios:
-     * 1. The --all flag is explicitly set
-     * 2. No specific workspace was specified via --workspace option
-     *
-     * This provides a convenient way to implement "run everywhere by default"
-     * behavior while still allowing users to target specific workspaces.
-     *
-     * Example:
-     * ```php
-     * if ($this->shouldRunOnAll()) {
-     *     $workspaces = $this->getAllWorkspaces();
-     * } else {
-     *     $workspaces = [$this->selectWorkspace()];
-     * }
-     * ```
-     *
-     * @return bool True if --all flag is set or no workspace specified
-     */
-    protected function shouldRunOnAll(): bool
-    {
-        // Check if --all flag is explicitly set
-        if ($this->hasOption('all')) {
-            return true;
-        }
-
-        // Check if no specific workspace was specified
-        $workspace = $this->option('workspace');
-
-        return in_array($workspace, [null, '', '0'], true);
-    }
-
-    /**
      * Output data in JSON format.
      *
      * This method formats and outputs data as pretty-printed JSON to the console.
@@ -589,41 +409,5 @@ abstract class BaseCommand extends Command
 
         // Output the JSON string to console
         $this->output->writeln($json);
-    }
-
-    /**
-     * Output data as a formatted table.
-     *
-     * This method creates and displays a formatted table in the console using
-     * Symfony Console's Table component. It's ideal for presenting structured
-     * data in a human-readable format.
-     *
-     * The table automatically adjusts column widths based on content and provides
-     * a clean, aligned display with borders and separators.
-     *
-     * Example:
-     * ```php
-     * $headers = ['Name', 'Type', 'Status'];
-     * $rows = [
-     *     ['demo-app', 'application', 'active'],
-     *     ['calculator', 'package', 'active'],
-     * ];
-     * $this->outputTable($headers, $rows);
-     * ```
-     *
-     * @param array<string>       $headers Table column headers
-     * @param array<array<mixed>> $rows    Table data rows
-     */
-    protected function outputTable(array $headers, array $rows): void
-    {
-        // Create a new table instance with the output interface
-        $table = new Table($this->output);
-
-        // Configure table with headers and rows
-        $table->setHeaders($headers);
-        $table->setRows($rows);
-
-        // Render the table to console
-        $table->render();
     }
 }

@@ -336,4 +336,177 @@ trait InteractsWithMonorepo
 
         return $data;
     }
+
+    /**
+     * Get all workspace names as a simple array.
+     *
+     * This method extracts just the workspace names from the full workspace
+     * metadata, returning a simple array of strings. This is useful for
+     * prompts, iteration, or filtering operations.
+     *
+     * Example:
+     * ```php
+     * $names = $this->getAllWorkspaceNames();
+     * // Returns: ['api', 'calculator', 'shared-utils']
+     * ```
+     *
+     * @return array<string> Array of workspace names
+     */
+    protected function getAllWorkspaceNames(): array
+    {
+        $workspaces = $this->getWorkspaces();
+
+        return array_map(
+            static fn (array $workspace): string => $workspace['name'],
+            $workspaces
+        );
+    }
+
+    /**
+     * Select a single workspace interactively or from option.
+     *
+     * This method provides a unified way to get a workspace selection from the user.
+     * It first checks if a workspace was specified via the --workspace option.
+     * If not, it prompts the user to select from available workspaces interactively.
+     *
+     * The method uses Laravel Prompts for a beautiful interactive selection experience
+     * when running in interactive mode. In non-interactive mode, it will return the
+     * first available workspace if no workspace option was provided.
+     *
+     * Example:
+     * ```php
+     * $workspace = $this->selectWorkspace('Which workspace to install?');
+     * $this->info("Installing in {$workspace}...");
+     * ```
+     *
+     * @param  string $prompt The prompt message to display to the user
+     * @return string The selected workspace name
+     *
+     * @throws RuntimeException If no workspaces are found
+     */
+    protected function selectWorkspace(string $prompt = 'Select workspace'): string
+    {
+        // Check if workspace was specified via --workspace option
+        $workspace = $this->option('workspace');
+        if (is_string($workspace) && $workspace !== '' && $workspace !== '0') {
+            return $workspace;
+        }
+
+        // Get all available workspaces
+        $workspaces = $this->getAllWorkspaceNames();
+
+        // If no workspaces available, throw an exception
+        if ($workspaces === []) {
+            throw new RuntimeException('No workspaces found in the monorepo.');
+        }
+
+        // If only one workspace exists, return it automatically
+        if (count($workspaces) === 1) {
+            return $workspaces[0];
+        }
+
+        // In non-interactive mode, return the first workspace
+        if ($this->option('no-interaction') === true) {
+            return $workspaces[0];
+        }
+
+        // Use interactive prompt to select workspace (from InteractsWithPrompts trait)
+        return (string) $this->select($prompt, $workspaces);
+    }
+
+    /**
+     * Select multiple workspaces interactively or from option.
+     *
+     * This method allows users to select one or more workspaces either via
+     * the --workspace option (comma-separated) or through an interactive
+     * multi-select prompt.
+     *
+     * The method handles several scenarios:
+     * - If --all flag is set, returns all available workspaces
+     * - If --workspace option is provided, parses comma-separated values
+     * - Otherwise, prompts user for interactive multi-selection
+     *
+     * Example:
+     * ```php
+     * $workspaces = $this->selectWorkspaces('Select workspaces to test');
+     * foreach ($workspaces as $workspace) {
+     *     $this->info("Testing {$workspace}...");
+     * }
+     * ```
+     *
+     * @param  string        $prompt The prompt message to display to the user
+     * @return array<string> Array of selected workspace names
+     *
+     * @throws RuntimeException If no workspaces are found
+     */
+    protected function selectWorkspaces(string $prompt = 'Select workspaces'): array
+    {
+        // If --all flag is set, return all workspaces
+        if ($this->shouldRunOnAll()) {
+            return $this->getAllWorkspaceNames();
+        }
+
+        // Check if workspace(s) were specified via --workspace option
+        $workspace = $this->option('workspace');
+        if (is_string($workspace) && $workspace !== '' && $workspace !== '0') {
+            // Split by comma to support multiple workspaces
+            $workspaces = array_map(trim(...), explode(',', $workspace));
+
+            return array_values(array_filter($workspaces, static fn ($w): bool => $w !== '' && $w !== '0'));
+        }
+
+        // Get all available workspaces
+        $allWorkspaces = $this->getAllWorkspaceNames();
+
+        // If no workspaces available, throw an exception
+        if ($allWorkspaces === []) {
+            throw new RuntimeException('No workspaces found in the monorepo.');
+        }
+
+        // In non-interactive mode, return all workspaces
+        if ($this->option('no-interaction') === true) {
+            return $allWorkspaces;
+        }
+
+        // Use interactive multi-select prompt (from InteractsWithPrompts trait)
+        $selected = $this->multiselect($prompt, $allWorkspaces);
+
+        // Ensure all values are strings
+        return array_map(strval(...), $selected);
+    }
+
+    /**
+     * Check if command should run on all workspaces.
+     *
+     * This method determines whether the command should be executed across
+     * all available workspaces. It returns true in two scenarios:
+     * 1. The --all flag is explicitly set
+     * 2. No specific workspace was specified via --workspace option
+     *
+     * This provides a convenient way to implement "run everywhere by default"
+     * behavior while still allowing users to target specific workspaces.
+     *
+     * Example:
+     * ```php
+     * if ($this->shouldRunOnAll()) {
+     *     $workspaces = $this->getAllWorkspaceNames();
+     * } else {
+     *     $workspaces = [$this->selectWorkspace()];
+     * }
+     * ```
+     *
+     * @return bool True if --all flag is set or no workspace specified
+     */
+    protected function shouldRunOnAll(): bool
+    {
+        // Check if --all flag is explicitly set
+        if ($this->hasOption('all')) {
+            return true;
+        }
+
+        // Check if no specific workspace was specified
+        $workspace = $this->option('workspace');
+
+        return in_array($workspace, [null, '', '0'], true);
+    }
 }
