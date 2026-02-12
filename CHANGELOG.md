@@ -5,6 +5,53 @@ All notable changes to PhpHive CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.19] - 2026-02-12
+
+### Added
+
+- **Package Type Architecture**: Implemented factory pattern for package types
+  - `PackageTypeInterface` - Contract for all package type implementations
+  - `AbstractPackageType` - Base implementation with common functionality
+  - Concrete types: `LaravelPackageType`, `MagentoPackageType`, `SymfonyPackageType`, `SkeletonPackageType`
+  - `PackageTypeFactory` - Creates and validates package type instances
+  - Type-specific behavior properly encapsulated
+  - Automatic file naming (ServiceProvider, Bundle, Extension)
+
+- **Foundation Services for Enhanced UX**:
+  - `NameSuggestionService` - Intelligent name suggestions with 5 strategies
+  - `PreflightChecker` - Environment validation before operations
+  - `PreflightResult` - Structured result object with error messages and fixes
+
+- **Restructured Stubs Directory**:
+  - Organized hierarchy: `apps/`, `packages/`, `config/`
+  - Removed -app and -package suffixes
+  - Added sample controllers for all package types
+  - Shared config files in dedicated directory
+
+- **Service Connection Verification**:
+  - Redis, Elasticsearch, Meilisearch, Minio connection checks
+  - Spinner UI with ping functionality
+  - Clear error messages on connection failure
+
+### Changed
+
+- **CreatePackageCommand**: Refactored to use package type architecture
+  - Delegates to package types for behavior
+  - Cleaner, more maintainable code
+  - Automatic composer install via postCreate hook
+
+- **AppTypes**: Updated for new stubs structure
+  - Use `apps/` directory instead of `-app` suffix
+  - Maintain backward compatibility
+
+- **Application**: Register new foundation services in container
+
+### Fixed
+
+- File naming for Laravel ServiceProvider (now properly named)
+- File naming for Symfony Bundle and Extension (now properly named)
+- Variable replacement in Magento XML files (MODULE_NAME, PACKAGE_NAME_NORMALIZED)
+
 ## [1.0.18] - 2026-02-12
 
 ### Added
@@ -179,7 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Beautiful interactive prompts using Laravel Prompts
   - Secure password masking for all credential inputs
 
-- **Password Masking**: Added `askPassword()` method to AbstractAppType
+- **Password Masking**: Added `password()` method to AbstractAppType
   - Magento private key now uses masked password input
   - Secure credential handling throughout the CLI
 
@@ -406,7 +453,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **--no-interaction flag**: Now properly supported across all app types
-  - Helper methods (askText, askSelect, askConfirm) check `isInteractive()` automatically
+  - Helper methods (text, askSelect, confirm) check `isInteractive()` automatically
   - Returns default values when running in non-interactive mode
   - No need to manually check in each app type's collectConfiguration
 - **Command execution directory**: Fixed composer install running in wrong directory

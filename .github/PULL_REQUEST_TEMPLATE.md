@@ -113,7 +113,7 @@ Include migration instructions for users.
 - [ ] All existing tests pass
 - [ ] New tests added for new functionality
 - [ ] Manual testing performed
-- [ ] Tested on multiple PHP versions (8.3, 8.4, 8.5)
+- [ ] Tested on multiple PHP versions (8.4, 8.5)
 - [ ] Tested on multiple operating systems
 
 ### Test Commands Run
