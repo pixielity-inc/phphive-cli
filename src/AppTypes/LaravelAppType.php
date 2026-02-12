@@ -289,14 +289,8 @@ class LaravelAppType extends AbstractAppType
         // Publish the modules configuration file
         $commands[] = 'php artisan vendor:publish --provider="Nwidart\Modules\LaravelModulesServiceProvider"';
 
-        // Update the modules config to scan the monorepo packages directory
-        // This allows modules to be shared across multiple Laravel apps in the monorepo
-        $commands[] = 'php -r "' .
-            '$config = file_get_contents(\'config/modules.php\'); ' .
-            '$config = preg_replace(\'/\'paths\' => \[.*?\]/s\', ' .
-            '\'\\\'paths\\\' => [\\n        \\\'modules\\\' => base_path(\\\'modules\\\'),\\n        ' .
-            '\\\'packages\\\' => base_path(\\\'../../../packages\\\'),\\n    ]\', $config); ' .
-            'file_put_contents(\'config/modules.php\', $config);"';
+        // Note: Manual configuration of config/modules.php may be needed to add monorepo packages path
+        // The modules config should include: 'packages' => base_path('../../../packages')
 
         // =====================================================================
         // STARTER KIT INSTALLATION
