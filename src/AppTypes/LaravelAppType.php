@@ -359,8 +359,41 @@ class LaravelAppType extends AbstractAppType
         // Octane provides high-performance application server with Swoole/RoadRunner/FrankenPHP
         // Using the user-selected server (default: RoadRunner - no PHP extensions required)
         if (($config[AppTypeInterface::CONFIG_INSTALL_OCTANE] ?? false) === true) {
-            $commands[] = 'composer require laravel/octane';
             $server = $config[AppTypeInterface::CONFIG_OCTANE_SERVER] ?? 'roadrunner';
+
+            // If Swoole is selected, check if it's installed and provide installation instructions
+            if ($server === 'swoole') {
+                // Check if Swoole extension is installed
+                $swooleInstalled = extension_loaded('swoole');
+
+                if (! $swooleInstalled) {
+                    $this->warning('Swoole PHP extension is not installed.');
+                    $this->note(
+                        "To install Swoole, run:\n\n" .
+                        "  macOS (with Homebrew):\n" .
+                        "    brew install swoole\n\n" .
+                        "  Linux (with PECL):\n" .
+                        "    pecl install swoole\n\n" .
+                        "  Or use Docker with a Swoole-enabled PHP image.\n\n" .
+                        "After installation, restart your terminal and verify with:\n" .
+                        '  php -m | grep swoole',
+                        'Installation Instructions'
+                    );
+
+                    $this->pause('Press enter after installing Swoole to continue...');
+
+                    // Verify installation after pause
+                    if (! extension_loaded('swoole')) {
+                        $this->error('Swoole extension is still not detected.');
+                        $this->warning('Octane will be installed but may not work without Swoole.');
+                        $this->pause('Press enter to continue anyway...');
+                    } else {
+                        $this->info('✓ Swoole extension detected!');
+                    }
+                }
+            }
+
+            $commands[] = 'composer require laravel/octane';
             $commands[] = "php artisan octane:install --server={$server}";
         }
 
