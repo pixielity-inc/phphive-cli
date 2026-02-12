@@ -361,35 +361,80 @@ class LaravelAppType extends AbstractAppType
         if (($config[AppTypeInterface::CONFIG_INSTALL_OCTANE] ?? false) === true) {
             $server = $config[AppTypeInterface::CONFIG_OCTANE_SERVER] ?? 'roadrunner';
 
-            // If Swoole is selected, check if it's installed and provide installation instructions
+            // If Swoole is selected, check if it's installed and attempt automatic installation
             if ($server === 'swoole') {
                 // Check if Swoole extension is installed
                 $swooleInstalled = extension_loaded('swoole');
 
                 if (! $swooleInstalled) {
                     $this->warning('Swoole PHP extension is not installed.');
-                    $this->note(
-                        "To install Swoole, run:\n\n" .
-                        "  macOS (with Homebrew):\n" .
-                        "    brew install swoole\n\n" .
-                        "  Linux (with PECL):\n" .
-                        "    pecl install swoole\n\n" .
-                        "  Or use Docker with a Swoole-enabled PHP image.\n\n" .
-                        "After installation, restart your terminal and verify with:\n" .
-                        '  php -m | grep swoole',
-                        'Installation Instructions'
+
+                    // Ask if user wants to attempt automatic installation
+                    $autoInstall = $this->confirm(
+                        label: 'Would you like to attempt automatic Swoole installation?',
+                        default: true,
+                        hint: 'This will use PECL or Homebrew depending on your system'
                     );
 
-                    $this->pause('Press enter after installing Swoole to continue...');
+                    if ($autoInstall) {
+                        $this->info('Attempting to install Swoole...');
 
-                    // Verify installation after pause
-                    if (! extension_loaded('swoole')) {
-                        $this->error('Swoole extension is still not detected.');
-                        $this->warning('Octane will be installed but may not work without Swoole.');
-                        $this->pause('Press enter to continue anyway...');
+                        // Detect OS and try appropriate installation method
+                        $os = PHP_OS_FAMILY;
+                        $installSuccess = false;
+
+                        if ($os === 'Darwin') {
+                            // macOS - try Homebrew first
+                            $this->info('Detected macOS - trying Homebrew installation...');
+                            exec('which brew', $output, $brewExists);
+
+                            if ($brewExists === 0) {
+                                exec('brew install swoole 2>&1', $output, $result);
+                                $installSuccess = ($result === 0);
+                            } else {
+                                $this->warning('Homebrew not found. Trying PECL...');
+                                exec('pecl install swoole 2>&1', $output, $result);
+                                $installSuccess = ($result === 0);
+                            }
+                        } else {
+                            // Linux or other - try PECL
+                            $this->info('Trying PECL installation...');
+                            exec('pecl install swoole 2>&1', $output, $result);
+                            $installSuccess = ($result === 0);
+                        }
+
+                        if ($installSuccess) {
+                            $this->info('✓ Swoole installation completed!');
+                            $this->warning('You may need to restart your terminal/PHP-FPM for changes to take effect.');
+                        } else {
+                            $this->error('Automatic installation failed.');
+                            $this->note(
+                                "Please install Swoole manually:\n\n" .
+                                "  macOS (with Homebrew):\n" .
+                                "    brew install swoole\n\n" .
+                                "  Linux (with PECL):\n" .
+                                "    pecl install swoole\n\n" .
+                                '  Or use Docker with a Swoole-enabled PHP image.',
+                                'Manual Installation'
+                            );
+                        }
                     } else {
-                        $this->info('✓ Swoole extension detected!');
+                        $this->note(
+                            "To install Swoole manually:\n\n" .
+                            "  macOS (with Homebrew):\n" .
+                            "    brew install swoole\n\n" .
+                            "  Linux (with PECL):\n" .
+                            "    pecl install swoole\n\n" .
+                            '  Or use Docker with a Swoole-enabled PHP image.',
+                            'Manual Installation'
+                        );
                     }
+
+                    $this->pause('Press enter to continue with Octane installation...');
+
+                    // Note: extension_loaded() won't detect newly installed extensions in the same process
+                    // User will need to restart terminal/PHP for it to be available
+                    $this->warning('Note: If Swoole was just installed, you may need to restart your terminal.');
                 }
             }
 
