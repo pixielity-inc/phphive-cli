@@ -115,6 +115,15 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       # ----------------------------------------------------------------------
+      # Configure Git
+      # ----------------------------------------------------------------------
+      - name: Configure Git
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # ----------------------------------------------------------------------
       # Update Version in Application.php
       # ----------------------------------------------------------------------
       - name: Update version in Application.php
@@ -148,15 +157,6 @@ jobs:
             git push origin main
             echo "Committed and pushed version updates"
           fi
-
-      # ----------------------------------------------------------------------
-      # Configure Git
-      # ----------------------------------------------------------------------
-      - name: Configure Git
-        if: steps.check_tag.outputs.exists == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       # ----------------------------------------------------------------------
       # Create Git Tag
