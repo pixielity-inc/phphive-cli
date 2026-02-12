@@ -82,7 +82,7 @@
     <rect x="0" y="0" width="200" height="40" rx="20" fill="#F39C12" opacity="0.2"/>
     <rect x="0" y="0" width="200" height="40" rx="20" fill="none" stroke="#F39C12" stroke-width="2"/>
     <text x="100" y="27" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="#F39C12" text-anchor="middle">
-      v1.0.10
+      v1.0.11
     </text>
   </g>
 
