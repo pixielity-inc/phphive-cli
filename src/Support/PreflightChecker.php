@@ -63,14 +63,14 @@ final readonly class PreflightChecker
     public function check(?string $workingDirectory = null): PreflightResult
     {
         $checks = [
-            'PHP Version' => fn () => $this->checkPhpVersion(),
-            'Composer' => fn () => $this->checkComposer(),
-            'Git' => fn () => $this->checkGit(),
+            'PHP Version' => $this->checkPhpVersion(...),
+            'Composer' => $this->checkComposer(...),
+            'Git' => $this->checkGit(...),
         ];
 
         // Add directory-specific checks if provided
         if ($workingDirectory !== null) {
-            $checks['Write Permissions'] = fn () => $this->checkWritePermissions($workingDirectory);
+            $checks['Write Permissions'] = fn (): array => $this->checkWritePermissions($workingDirectory);
         }
 
         $results = [];
@@ -150,7 +150,7 @@ final readonly class PreflightChecker
                 'passed' => true,
                 'message' => "Composer {$version} installed",
             ];
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
                 'passed' => false,
                 'message' => 'Composer found but not working correctly',

@@ -130,12 +130,12 @@ final class NameSuggestionService
      */
     public function getBestSuggestion(array $suggestions): ?string
     {
-        if (count($suggestions) === 0) {
+        if ($suggestions === []) {
             return null;
         }
 
         // Score each suggestion
-        $scored = array_map(function ($suggestion) {
+        $scored = array_map(function ($suggestion): array {
             $score = 0;
 
             // Prefer shorter names
@@ -159,7 +159,7 @@ final class NameSuggestionService
         }, $suggestions);
 
         // Sort by score (highest first)
-        usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
+        usort($scored, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
 
         return $scored[0]['name'];
     }
