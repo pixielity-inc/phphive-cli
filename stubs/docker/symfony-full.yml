@@ -4,6 +4,7 @@
 # Services:
 # - postgres: PostgreSQL 15 database server
 # - redis: Redis 7 for caching and sessions
+# - rabbitmq: RabbitMQ message broker with management UI
 # - elasticsearch: Elasticsearch 8.x for search
 # - kibana: Kibana web interface for Elasticsearch (optional)
 # - mailpit: Email testing tool
@@ -16,6 +17,8 @@
 # Access:
 #   PostgreSQL: localhost:5432
 #   Redis: localhost:6379
+#   RabbitMQ AMQP: localhost:5672
+#   RabbitMQ Management: http://localhost:15672
 #   Elasticsearch: localhost:9200
 #   Kibana: http://localhost:5601
 #   Mailpit SMTP: localhost:1025
@@ -62,6 +65,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # RabbitMQ Message Broker Service
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: "{{CONTAINER_PREFIX}}-rabbitmq"
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "{{RABBITMQ_USER}}"
+      RABBITMQ_DEFAULT_PASS: "{{RABBITMQ_PASSWORD}}"
+      RABBITMQ_DEFAULT_VHOST: "{{RABBITMQ_VHOST}}"
+    ports:
+      - "{{RABBITMQ_PORT}}:5672" # AMQP protocol port
+      - "{{RABBITMQ_MANAGEMENT_PORT}}:15672" # Management UI port
+    volumes:
+      - "{{VOLUME_PREFIX}}-rabbitmq-data:/var/lib/rabbitmq"
+      - "{{VOLUME_PREFIX}}-rabbitmq-log:/var/log/rabbitmq"
+    networks:
+      - "{{NETWORK_NAME}}"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Elasticsearch Search Service
   elasticsearch:
@@ -137,6 +164,10 @@ volumes:
   "{{VOLUME_PREFIX}}-postgres-data":
     driver: local
   "{{VOLUME_PREFIX}}-redis-data":
+    driver: local
+  "{{VOLUME_PREFIX}}-rabbitmq-data":
+    driver: local
+  "{{VOLUME_PREFIX}}-rabbitmq-log":
     driver: local
   "{{VOLUME_PREFIX}}-elasticsearch-data":
     driver: local

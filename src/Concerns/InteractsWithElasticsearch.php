@@ -194,6 +194,62 @@ trait InteractsWithElasticsearch
     }
 
     /**
+     * Setup AWS OpenSearch configuration.
+     *
+     * @param  string               $appName The application name
+     * @return array<string, mixed> OpenSearch configuration
+     */
+    protected function setupOpenSearch(string $appName): array
+    {
+        $this->note(
+            'AWS OpenSearch requires AWS credentials. You can configure them in your .env file.',
+            'AWS Configuration'
+        );
+
+        // Prompt for AWS configuration
+        $region = $this->text(
+            label: 'AWS Region',
+            placeholder: 'us-east-1',
+            default: 'us-east-1',
+            required: true,
+            hint: 'AWS region where your OpenSearch domain is located'
+        );
+
+        $endpoint = $this->text(
+            label: 'OpenSearch endpoint',
+            placeholder: 'search-my-domain-abc123.us-east-1.es.amazonaws.com',
+            required: true,
+            hint: 'Your OpenSearch domain endpoint (without https://)'
+        );
+
+        $indexPrefix = $this->text(
+            label: 'Index prefix (optional)',
+            placeholder: $appName,
+            default: $appName,
+            required: false,
+            hint: 'Prefix for index names'
+        );
+
+        $this->note(
+            "Configure AWS credentials in your .env file:\n\n" .
+            "AWS_ACCESS_KEY_ID=your-access-key\n" .
+            "AWS_SECRET_ACCESS_KEY=your-secret-key\n" .
+            "AWS_DEFAULT_REGION={$region}\n" .
+            "OPENSEARCH_ENDPOINT=https://{$endpoint}\n" .
+            "OPENSEARCH_INDEX_PREFIX={$indexPrefix}",
+            'Environment Variables'
+        );
+
+        return [
+            'search_engine' => 'opensearch',
+            'opensearch_endpoint' => $endpoint,
+            'opensearch_region' => $region,
+            'opensearch_index_prefix' => $indexPrefix,
+            AppTypeInterface::CONFIG_USING_DOCKER => false,
+        ];
+    }
+
+    /**
      * Set up Elasticsearch using Docker containers.
      *
      * Creates a Docker Compose configuration with the selected Elasticsearch

@@ -10,10 +10,12 @@ use PhpHive\Cli\Concerns\InteractsWithElasticsearch;
 use PhpHive\Cli\Concerns\InteractsWithMeilisearch;
 use PhpHive\Cli\Concerns\InteractsWithMinio;
 use PhpHive\Cli\Concerns\InteractsWithPrompts;
+use PhpHive\Cli\Concerns\InteractsWithQueue;
 use PhpHive\Cli\Concerns\InteractsWithRedis;
 use PhpHive\Cli\Contracts\AppTypeInterface;
 use PhpHive\Cli\Support\Composer;
 use PhpHive\Cli\Support\Filesystem;
+use PhpHive\Cli\Support\Process;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -69,6 +71,7 @@ abstract class AbstractAppType implements AppTypeInterface
     use InteractsWithMeilisearch;
     use InteractsWithMinio;
     use InteractsWithPrompts;
+    use InteractsWithQueue;
     use InteractsWithRedis;
 
     /**
@@ -356,5 +359,190 @@ abstract class AbstractAppType implements AppTypeInterface
     protected function composerService(): Composer
     {
         return Composer::make();
+    }
+
+    /**
+     * Get the Process service instance.
+     *
+     * Returns a Process service instance for executing shell commands.
+     * This method creates a new instance each time it's called.
+     *
+     * Example usage:
+     * ```php
+     * // Run a command
+     * $result = $this->process()->run(['php', '--version']);
+     *
+     * // Check if command succeeds
+     * if ($this->process()->succeeds(['which', 'docker'])) {
+     *     // Docker is available
+     * }
+     * ```
+     *
+     * @return Process The Process service instance
+     */
+    protected function process(): Process
+    {
+        return Process::make();
+    }
+
+    /**
+     * Set up infrastructure services with Docker-first approach.
+     *
+     * This method orchestrates the setup of all infrastructure services
+     * (database, cache, queue, search, storage) in a unified, consistent way.
+     * It provides a Docker-first approach with graceful fallbacks to local setups.
+     *
+     * All services are optional and can be configured through the $options array.
+     * Services are set up in order: Database → Cache → Queue → Search → Storage
+     *
+     * Options:
+     * - needsDatabase (bool): Whether database is required (default: true)
+     * - databases (array): Supported database types (default: ['mysql', 'postgresql'])
+     * - needsCache (bool): Whether to prompt for cache (default: true)
+     * - needsQueue (bool): Whether to prompt for queue (default: true)
+     * - needsSearch (bool): Whether to prompt for search (default: true)
+     * - needsStorage (bool): Whether to prompt for storage (default: false)
+     *
+     * Example usage:
+     * ```php
+     * $infraConfig = $this->setupInfrastructure(
+     *     'my-app',
+     *     '/path/to/app',
+     *     [
+     *         'needsDatabase' => true,
+     *         'databases' => ['mysql', 'postgresql', 'sqlite'],
+     *         'needsCache' => true,
+     *         'needsQueue' => true,
+     *         'needsSearch' => true,
+     *         'needsStorage' => false,
+     *     ]
+     * );
+     * ```
+     *
+     * Return value structure:
+     * ```php
+     * [
+     *     // Database
+     *     'db_type' => 'mysql',
+     *     'db_host' => 'localhost',
+     *     'db_port' => 3306,
+     *     'db_name' => 'my_app',
+     *     'db_user' => 'my_app_user',
+     *     'db_password' => '********',
+     *     'using_docker' => true,
+     *
+     *     // Cache (Redis)
+     *     'redis_host' => 'localhost',
+     *     'redis_port' => 6379,
+     *     'redis_password' => '********',
+     *
+     *     // Queue
+     *     'queue_driver' => 'rabbitmq',
+     *     'queue_host' => 'localhost',
+     *     'queue_port' => 5672,
+     *
+     *     // Search
+     *     'search_engine' => 'opensearch',
+     *     'opensearch_endpoint' => 'search-domain.us-east-1.es.amazonaws.com',
+     *     'opensearch_region' => 'us-east-1',
+     *
+     *     // Storage
+     *     'minio_endpoint' => 'localhost',
+     *     'minio_port' => 9000,
+     * ]
+     * ```
+     *
+     * @param  string $appName Application name for defaults
+     * @param  string $appPath Absolute path to application directory
+     * @param  array  $options Configuration options
+     * @return array  Infrastructure configuration array
+     */
+    protected function setupInfrastructure(
+        string $appName,
+        string $appPath,
+        array $options = []
+    ): array {
+        $config = [];
+
+        $this->line('');
+        $this->comment('Infrastructure Setup:');
+        $this->line('');
+
+        // 1. Database Setup (Docker-first)
+        if ($options['needsDatabase'] ?? true) {
+            $this->info('📦 Database Configuration');
+            $dbConfig = $this->setupDatabase(
+                $appName,
+                $options['databases'] ?? ['mysql', 'postgresql'],
+                $appPath
+            );
+            $config = array_merge($config, $dbConfig);
+            $this->line('');
+        }
+
+        // 2. Cache Setup (Redis)
+        if ($options['needsCache'] ?? true) {
+            if ($this->confirm('Install Redis for caching/sessions?', true)) {
+                $this->info('🔄 Redis Configuration');
+                $redisConfig = $this->setupRedis($appName, $appPath);
+                $config = array_merge($config, $redisConfig);
+                $this->line('');
+            }
+        }
+
+        // 3. Queue Setup (Redis/RabbitMQ/SQS)
+        if ($options['needsQueue'] ?? true) {
+            if ($this->confirm('Configure message queue?', false)) {
+                $this->info('📨 Queue Configuration');
+                $queueConfig = $this->setupQueue($appName, $appPath);
+                $config = array_merge($config, $queueConfig);
+                $this->line('');
+            }
+        }
+
+        // 4. Search Engine Setup (Meilisearch/Elasticsearch/OpenSearch)
+        if ($options['needsSearch'] ?? true) {
+            $searchEngine = $this->select(
+                label: 'Search engine',
+                options: [
+                    'none' => 'None',
+                    'meilisearch' => 'Meilisearch (Fast, typo-tolerant)',
+                    'elasticsearch' => 'Elasticsearch (Full-featured, self-hosted)',
+                    'opensearch' => 'AWS OpenSearch (Managed cloud service)',
+                ],
+                default: 'none'
+            );
+
+            if ($searchEngine !== 'none') {
+                $this->info('🔍 ' . ucfirst($searchEngine) . ' Configuration');
+
+                if ($searchEngine === 'opensearch') {
+                    $searchConfig = $this->setupOpenSearch($appName);
+                } else {
+                    $setupMethod = 'setup' . ucfirst($searchEngine);
+                    $searchConfig = $this->$setupMethod($appName, $appPath);
+                }
+
+                $config = array_merge($config, $searchConfig);
+                $this->line('');
+            }
+        }
+
+        // 5. Object Storage Setup (Minio)
+        if ($options['needsStorage'] ?? false) {
+            if ($this->confirm('Install Minio for object storage (S3-compatible)?', false)) {
+                $this->info('💾 Minio Configuration');
+                $minioConfig = $this->setupMinio($appName, $appPath);
+                $config = array_merge($config, $minioConfig);
+                $this->line('');
+            }
+        }
+
+        if ($config !== []) {
+            $this->info('✓ Infrastructure setup complete!');
+            $this->line('');
+        }
+
+        return $config;
     }
 }
