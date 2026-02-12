@@ -218,6 +218,11 @@ trait ChecksForUpdates
         // Find latest stable version
         $latestVersion = null;
         foreach ($versions as $version => $info) {
+            // Ensure version is a string
+            if (! is_string($version)) {
+                continue;
+            }
+
             // Skip dev versions
             if (str_contains($version, 'dev')) {
                 continue;
