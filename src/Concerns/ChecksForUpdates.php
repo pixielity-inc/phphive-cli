@@ -283,7 +283,6 @@ trait ChecksForUpdates
 
         // Build the notification
         $width = 60;
-        $padding = 2;
 
         $lines = [
             '',
