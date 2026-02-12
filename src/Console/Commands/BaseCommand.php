@@ -109,6 +109,11 @@ abstract class BaseCommand extends Command
      * - --force, -f: Force operation by ignoring cache
      * - --no-cache: Disable Turbo cache for this run
      * - --no-interaction, -n: Run in non-interactive mode
+     * - --all: Apply operation to all workspaces
+     * - --dry-run: Preview what would happen without executing
+     *
+     * Note: Some commands may define additional options like --json or --parallel
+     * specific to their functionality. Check individual command help for details.
      *
      * Child commands should call parent::configure() first to inherit these
      * common options, then add their specific options and arguments:
@@ -153,6 +158,20 @@ abstract class BaseCommand extends Command
             'n',
             InputOption::VALUE_NONE,
             'Run in non-interactive mode',
+        );
+
+        $this->addOption(
+            'all',
+            null,
+            InputOption::VALUE_NONE,
+            'Apply operation to all workspaces',
+        );
+
+        $this->addOption(
+            'dry-run',
+            null,
+            InputOption::VALUE_NONE,
+            'Preview what would happen without executing',
         );
     }
 

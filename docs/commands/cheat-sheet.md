@@ -68,14 +68,23 @@ hive quality:test --testsuite=Unit
 # Run with coverage
 hive quality:test --coverage
 
+# Run tests in parallel
+hive quality:test --parallel
+
 # Check code style
 hive quality:lint
 
 # Fix code style
 hive quality:format
 
+# Preview formatting changes
+hive quality:format --dry-run
+
 # Run static analysis
 hive quality:typecheck
+
+# Preview refactoring
+hive quality:refactor --dry-run
 
 # Apply refactoring
 hive quality:refactor
@@ -131,11 +140,14 @@ hive deploy
 # Deploy to specific environment
 hive deploy --env=production
 
+# Preview deployment
+hive deploy --dry-run
+
 # Publish packages
 hive publish
 
-# Dry run
-hive deploy --dry-run
+# Preview publish
+hive publish --dry-run
 ```
 
 ## Turborepo
@@ -179,13 +191,19 @@ All commands support these options:
 
 ```bash
 --workspace, -w=NAME    # Target specific workspace
---force, -f             # Force operation
---no-cache              # Disable cache
+--force, -f             # Force operation (skip cache)
+--no-cache              # Disable Turbo cache
 --no-interaction, -n    # Non-interactive mode
+--all                   # Apply to all workspaces
+--json                  # Output in JSON format
+--parallel              # Enable parallel execution
+--dry-run               # Preview without executing
 --help, -h              # Show help
 --quiet, -q             # Suppress output
---verbose, -v           # Verbose output
+--verbose, -v           # Verbose output (-vv, -vvv for more)
 ```
+
+**[→ See detailed documentation](./common-options.md)**
 
 ## Aliases
 
@@ -223,7 +241,7 @@ hive ver                     # system:version
 ### Starting a New Project
 
 ```bash
-# 1. Create workspace
+# 1. Create workspace (clones from template)
 hive make:workspace
 
 # 2. Navigate to workspace
@@ -237,7 +255,7 @@ hive composer:install
 hive make:app api --type=laravel
 
 # 5. Run tests
-hive quality:test
+hive quality:test --parallel
 ```
 
 ### Daily Development
@@ -263,7 +281,7 @@ hive quality:format
 cd cli && composer check
 
 # Or individually
-hive quality:test
+hive quality:test --parallel
 hive quality:lint
 hive quality:typecheck
 hive quality:refactor --dry-run
@@ -272,13 +290,16 @@ hive quality:refactor --dry-run
 ### Deployment
 
 ```bash
+# Preview deployment
+hive deploy --dry-run
+
 # Build all apps
-hive build
+hive build --all
 
-# Run tests
-hive quality:test
+# Run tests in parallel
+hive quality:test --parallel
 
-# Deploy
+# Deploy to production
 hive deploy --env=production
 ```
 
@@ -306,7 +327,11 @@ hive composer:require symfony/console -w my-package
 Use Turborepo for parallel execution:
 
 ```bash
-hive run test  # Runs tests in all workspaces in parallel
+# Runs tests in all workspaces in parallel
+hive run test
+
+# Run with parallel flag
+hive quality:test --parallel
 ```
 
 ### Check Command Help
@@ -324,6 +349,22 @@ hive quality:test -h
 hive t              # quality:test
 hive fmt            # quality:format
 hive tc             # quality:typecheck
+hive i              # composer:install
+hive req            # composer:require
+```
+
+### Preview Before Executing
+
+```bash
+hive deploy --dry-run           # Preview deployment
+hive quality:refactor --dry-run # Preview refactoring
+hive clean:all --dry-run        # Preview cleanup
+```
+
+### Use JSON Output for Automation
+
+```bash
+hive workspace:list --json | jq '.workspaces[].name'
 ```
 
 ---

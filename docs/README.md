@@ -15,6 +15,8 @@ Learn how to install, configure, and start using PhpHive CLI.
 ### [Commands Reference](./commands/README.md)
 Complete reference for all PhpHive commands with examples and options.
 
+- [Common Options](./commands/common-options.md)
+- [Command Cheat Sheet](./commands/cheat-sheet.md)
 - [Workspace Commands](./commands/workspace.md)
 - [Make Commands](./commands/make.md)
 - [Composer Commands](./commands/composer.md)
@@ -29,6 +31,7 @@ Complete reference for all PhpHive commands with examples and options.
 ### [Features Guide](./features/README.md)
 In-depth explanations of PhpHive features and capabilities.
 
+- [Gradient Banner](./features/gradient-banner.md)
 - [Multi-Framework Support](./features/multi-framework.md)
 - [Turborepo Integration](./features/turborepo.md)
 - [Quality Tools](./features/quality-tools.md)

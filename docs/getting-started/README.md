@@ -44,8 +44,9 @@ Use it via Composer scripts or directly:
 
 PhpHive requires:
 
-- **PHP 8.3+** - Modern PHP features and performance
+- **PHP 8.4+** - Modern PHP features and performance
 - **Composer 2.0+** - Dependency management
+- **Symfony 7.0 or 8.0** - Automatically resolved
 - **Node.js 18+** (optional) - For Turborepo features
 - **pnpm** (optional) - Workspace package manager
 
@@ -79,14 +80,21 @@ Let's create your first monorepo workspace!
 
 ### Step 1: Initialize Workspace
 
+PhpHive clones from an official template repository with pre-configured structure:
+
 ```bash
 hive make:workspace
 ```
 
 You'll be prompted for:
 - **Workspace name** - e.g., `my-monorepo`
-- **Workspace type** - Choose `monorepo`
-- **Initialize Git** - Recommended: Yes
+
+The command will:
+- Clone from https://github.com/pixielity-co/hive-template
+- Set up complete monorepo structure
+- Include sample app and package
+- Initialize fresh Git repository
+- Update package names automatically
 
 ### Step 2: Navigate to Workspace
 
@@ -110,7 +118,14 @@ hive make:app my-api --type=laravel
 ### Step 5: Run Tests
 
 ```bash
+# Run all tests
 hive quality:test
+
+# Run tests in parallel
+hive quality:test --parallel
+
+# Run with coverage
+hive quality:test --coverage
 ```
 
 🎉 **Congratulations!** You've created your first PhpHive workspace.
@@ -160,6 +175,8 @@ Now that you're set up, explore these topics:
 
 ### Recommended Reading
 
+- [Gradient Banner Feature](../features/gradient-banner.md)
+- [Common Command Options](../commands/common-options.md)
 - [Configuration Guide](./configuration.md)
 - [Command Reference](../commands/README.md)
 - [Best Practices](../guides/best-practices.md)

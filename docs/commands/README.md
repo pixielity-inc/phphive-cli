@@ -25,9 +25,15 @@ All commands support these common options:
 - `--force, -f` - Force operation (skip cache)
 - `--no-cache` - Disable Turbo cache
 - `--no-interaction, -n` - Run in non-interactive mode
+- `--all` - Apply operation to all workspaces
+- `--json` - Output data in JSON format
+- `--parallel` - Enable parallel execution across workspaces
+- `--dry-run` - Preview what would happen without executing
 - `--help, -h` - Display help
 - `--quiet, -q` - Suppress output
 - `--verbose, -v` - Verbose output
+
+**[→ See detailed common options documentation](./common-options.md)**
 
 ---
 
