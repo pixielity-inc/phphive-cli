@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PhpHive\Cli\Console\Commands\Make;
 
 use function is_dir;
-use function Laravel\Prompts\select;
 
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
@@ -119,10 +118,16 @@ final class CreateAppCommand extends BaseCommand
             )
             // Magento-specific options
             ->addOption(
+                'magento-edition',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Magento edition (community, enterprise)',
+            )
+            ->addOption(
                 'magento-version',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Magento version (2.4.6, 2.4.7)',
+                'Magento version (2.4.5, 2.4.6, 2.4.7)',
             )
             ->addOption(
                 'magento-public-key',
@@ -377,7 +382,7 @@ final class CreateAppCommand extends BaseCommand
             }
         } else {
             // Prompt user to select app type
-            $appTypeId = select(
+            $appTypeId = $this->select(
                 label: 'Select application type',
                 options: AppTypeFactory::getChoices()
             );
