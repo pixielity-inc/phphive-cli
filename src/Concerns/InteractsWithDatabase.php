@@ -4,16 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\password;
-use function Laravel\Prompts\select;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
-
 use mysqli;
 use PhpHive\Cli\Support\Filesystem;
 use RuntimeException;
@@ -146,12 +136,12 @@ trait InteractsWithDatabase
         // Check if Docker is available (requires InteractsWithDocker trait)
         if ($this->isDockerAvailable()) {
             // Docker is available - offer Docker setup
-            note(
+            $this->note(
                 'Docker detected! Using Docker provides isolated databases, easy management, and no local installation needed.',
                 'Database Setup'
             );
 
-            $useDocker = confirm(
+            $useDocker = $this->confirm(
                 label: 'Would you like to use Docker for the database? (recommended)',
                 default: true
             );
@@ -163,18 +153,18 @@ trait InteractsWithDatabase
                 }
 
                 // Docker setup failed, fall back to local
-                warning('Docker setup failed. Falling back to local database setup.');
+                $this->warning('Docker setup failed. Falling back to local database setup.');
             }
         } elseif (! $this->isDockerInstalled()) {
             // Docker not installed - offer installation guidance
-            $installDocker = confirm(
+            $installDocker = $this->confirm(
                 label: 'Docker is not installed. Would you like to see installation instructions?',
                 default: false
             );
 
             if ($installDocker) {
                 $this->provideDockerInstallationGuidance();
-                info('After installing Docker, you can recreate this application to use Docker.');
+                $this->info('After installing Docker, you can recreate this application to use Docker.');
             }
         }
 
@@ -233,7 +223,7 @@ trait InteractsWithDatabase
             // Filter to only supported types
             $filteredOptions = array_intersect_key($dbTypeOptions, array_flip($supportedDatabases));
 
-            $selectedType = select(
+            $selectedType = $this->select(
                 label: 'Select database type',
                 options: $filteredOptions,
                 default: $supportedDatabases[0]
@@ -241,14 +231,14 @@ trait InteractsWithDatabase
             $dbType = is_string($selectedType) ? $selectedType : (string) $selectedType;
         } else {
             $dbType = $supportedDatabases[0];
-            info("Using {$dbType} database");
+            $this->info("Using {$dbType} database");
         }
 
         // =====================================================================
         // OPTIONAL SERVICES
         // =====================================================================
 
-        $includeAdmin = confirm(
+        $includeAdmin = $this->confirm(
             label: 'Include database admin tool? (phpMyAdmin/Adminer)',
             default: true
         );
@@ -259,19 +249,19 @@ trait InteractsWithDatabase
 
         $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $appName) ?? $appName);
 
-        $dbName = text(
+        $dbName = $this->text(
             label: 'Database name',
             default: $normalizedName,
             required: true
         );
 
-        $dbUser = text(
+        $dbUser = $this->text(
             label: 'Database username',
             default: "{$normalizedName}_user",
             required: true
         );
 
-        $dbPassword = password(
+        $dbPassword = $this->password(
             label: 'Database password',
             required: true,
             hint: 'Enter a secure password for the database user'
@@ -284,7 +274,7 @@ trait InteractsWithDatabase
         // GENERATE DOCKER COMPOSE FILE
         // =====================================================================
 
-        info('Generating docker-compose.yml...');
+        $this->info('Generating docker-compose.yml...');
 
         $composeGenerated = $this->generateDockerComposeFile(
             $appPath,
@@ -298,7 +288,7 @@ trait InteractsWithDatabase
         );
 
         if (! $composeGenerated) {
-            error('Failed to generate docker-compose.yml');
+            $this->error('Failed to generate docker-compose.yml');
 
             return null;
         }
@@ -307,15 +297,15 @@ trait InteractsWithDatabase
         // START CONTAINERS
         // =====================================================================
 
-        info('Starting Docker containers...');
+        $this->info('Starting Docker containers...');
 
-        $started = spin(
+        $started = $this->spin(
             callback: fn (): bool => $this->startDockerContainers($appPath),
             message: 'Starting containers...'
         );
 
         if (! $started) {
-            error('Failed to start Docker containers');
+            $this->error('Failed to start Docker containers');
 
             return null;
         }
@@ -324,7 +314,7 @@ trait InteractsWithDatabase
         // WAIT FOR DATABASE
         // =====================================================================
 
-        info('Waiting for database to be ready...');
+        $this->info('Waiting for database to be ready...');
 
         $serviceName = match ($dbType) {
             'postgresql' => 'postgres',
@@ -332,15 +322,15 @@ trait InteractsWithDatabase
             default => 'mysql',
         };
 
-        $ready = spin(
+        $ready = $this->spin(
             callback: fn (): bool => $this->waitForDockerService($appPath, $serviceName, 30),
             message: 'Waiting for database...'
         );
 
         if (! $ready) {
-            warning('Database may not be fully ready. You may need to wait a moment before using it.');
+            $this->warning('Database may not be fully ready. You may need to wait a moment before using it.');
         } else {
-            info('✓ Database is ready!');
+            $this->info('✓ Database is ready!');
         }
 
         // =====================================================================
@@ -352,10 +342,10 @@ trait InteractsWithDatabase
             default => 3306,
         };
 
-        info('✓ Docker database setup complete!');
+        $this->info('✓ Docker database setup complete!');
         if ($includeAdmin) {
             $adminUrl = $dbType === 'postgresql' ? 'http://localhost:8080' : 'http://localhost:8080';
-            info("Database admin tool: {$adminUrl}");
+            $this->info("Database admin tool: {$adminUrl}");
         }
 
         return [
@@ -488,12 +478,12 @@ trait InteractsWithDatabase
      */
     protected function setupLocalDatabase(string $appName): array
     {
-        note(
+        $this->note(
             'Setting up local MySQL database. Ensure MySQL is installed and running.',
             'Local Database Setup'
         );
 
-        $autoSetup = confirm(
+        $autoSetup = $this->confirm(
             label: 'Would you like automatic MySQL database setup?',
             default: true
         );
@@ -719,7 +709,7 @@ trait InteractsWithDatabase
         }
 
         // Display informational note about automatic setup
-        note(
+        $this->note(
             'Automatic database setup will create a MySQL database and user for your application.',
             'Automatic Database Setup'
         );
@@ -729,7 +719,7 @@ trait InteractsWithDatabase
         // =====================================================================
 
         // Prompt for MySQL host
-        $host = text(
+        $host = $this->text(
             label: 'MySQL host',
             placeholder: '127.0.0.1',
             default: '127.0.0.1',
@@ -738,7 +728,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for MySQL port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'MySQL port',
             placeholder: '3306',
             default: '3306',
@@ -753,10 +743,10 @@ trait InteractsWithDatabase
 
         // Test connection with a temporary admin connection
         // We'll ask for credentials after verifying MySQL is accessible
-        info('Testing MySQL connection...');
+        $this->info('Testing MySQL connection...');
 
         // Prompt for admin credentials to test connection
-        $adminUser = text(
+        $adminUser = $this->text(
             label: 'MySQL admin username',
             placeholder: 'root',
             default: 'root',
@@ -764,7 +754,7 @@ trait InteractsWithDatabase
             hint: 'User with CREATE DATABASE and CREATE USER privileges'
         );
 
-        $adminPass = password(
+        $adminPass = $this->password(
             label: 'MySQL admin password',
             placeholder: 'Enter admin password',
             required: false,
@@ -772,19 +762,19 @@ trait InteractsWithDatabase
         );
 
         // Test connection with spinner for better UX
-        $connectionSuccess = spin(
+        $connectionSuccess = $this->spin(
             callback: fn (): bool => $this->checkMySQLConnection($host, $port, $adminUser, $adminPass),
             message: 'Connecting to MySQL...'
         );
 
         if (! $connectionSuccess) {
-            error('Failed to connect to MySQL. Please check your credentials and try again.');
-            warning('Falling back to manual database configuration.');
+            $this->error('Failed to connect to MySQL. Please check your credentials and try again.');
+            $this->warning('Falling back to manual database configuration.');
 
             return null;
         }
 
-        info('✓ MySQL connection successful!');
+        $this->info('✓ MySQL connection successful!');
 
         // =====================================================================
         // DATABASE CONFIGURATION
@@ -794,7 +784,7 @@ trait InteractsWithDatabase
         $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $appName) ?? $appName);
 
         // Prompt for database name
-        $dbName = text(
+        $dbName = $this->text(
             label: 'Database name',
             placeholder: $normalizedName,
             default: $normalizedName,
@@ -803,7 +793,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for database user
-        $dbUser = text(
+        $dbUser = $this->text(
             label: 'Database username',
             placeholder: "{$normalizedName}_user",
             default: "{$normalizedName}_user",
@@ -812,7 +802,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for database password
-        $dbPass = password(
+        $dbPass = $this->password(
             label: 'Database password',
             placeholder: 'Enter a secure password',
             required: true,
@@ -823,10 +813,10 @@ trait InteractsWithDatabase
         // DATABASE CREATION
         // =====================================================================
 
-        info('Creating database and user...');
+        $this->info('Creating database and user...');
 
         // Create database and user with spinner
-        $creationSuccess = spin(
+        $creationSuccess = $this->spin(
             callback: fn (): bool => $this->createMySQLDatabase(
                 $host,
                 $port,
@@ -840,13 +830,13 @@ trait InteractsWithDatabase
         );
 
         if (! $creationSuccess) {
-            error('Failed to create database or user. Please check admin privileges and try again.');
-            warning('Falling back to manual database configuration.');
+            $this->error('Failed to create database or user. Please check admin privileges and try again.');
+            $this->warning('Falling back to manual database configuration.');
 
             return null;
         }
 
-        info('✓ Database and user created successfully!');
+        $this->info('✓ Database and user created successfully!');
 
         // Return database configuration
         return [
@@ -920,7 +910,7 @@ trait InteractsWithDatabase
         }
 
         // Display informational note about manual setup
-        note(
+        $this->note(
             'Please enter the connection details for your existing MySQL database.',
             'Manual Database Configuration'
         );
@@ -930,7 +920,7 @@ trait InteractsWithDatabase
         // =====================================================================
 
         // Prompt for database host
-        $host = text(
+        $host = $this->text(
             label: 'Database host',
             placeholder: '127.0.0.1',
             default: '127.0.0.1',
@@ -939,7 +929,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for database port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Database port',
             placeholder: '3306',
             default: '3306',
@@ -949,7 +939,7 @@ trait InteractsWithDatabase
         $port = (int) $portInput;
 
         // Prompt for database name
-        $dbName = text(
+        $dbName = $this->text(
             label: 'Database name',
             placeholder: $normalizedName,
             default: $normalizedName,
@@ -958,7 +948,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for database user
-        $dbUser = text(
+        $dbUser = $this->text(
             label: 'Database username',
             placeholder: 'root',
             default: 'root',
@@ -967,7 +957,7 @@ trait InteractsWithDatabase
         );
 
         // Prompt for database password
-        $dbPass = password(
+        $dbPass = $this->password(
             label: 'Database password',
             placeholder: 'Enter database password',
             required: false,

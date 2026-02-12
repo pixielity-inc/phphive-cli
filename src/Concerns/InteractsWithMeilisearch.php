@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
-
-use Symfony\Component\Process\Process;
+use PhpHive\Cli\Support\Filesystem;
+use PhpHive\Cli\Support\Process;
+use RuntimeException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
  * Meilisearch Interaction Trait.
@@ -87,6 +82,28 @@ use Symfony\Component\Process\Process;
 trait InteractsWithMeilisearch
 {
     /**
+     * Get the Process service instance.
+     *
+     * This method provides access to the Process service for command execution.
+     * It should be implemented by the class using this trait to return the
+     * appropriate Process instance from the dependency injection container.
+     *
+     * @return Process The Process service instance
+     */
+    abstract protected function process(): Process;
+
+    /**
+     * Get the Filesystem service instance.
+     *
+     * This method provides access to the Filesystem service for file operations.
+     * It should be implemented by the class using this trait to return the
+     * appropriate Filesystem instance from the dependency injection container.
+     *
+     * @return Filesystem The Filesystem service instance
+     */
+    abstract protected function filesystem(): Filesystem;
+
+    /**
      * Orchestrate Meilisearch setup with Docker-first approach.
      *
      * This is the main entry point for Meilisearch setup. It intelligently
@@ -129,12 +146,12 @@ trait InteractsWithMeilisearch
         // Check if Docker is available (requires InteractsWithDocker trait)
         if ($this->isDockerAvailable()) {
             // Docker is available - offer Docker setup
-            note(
+            $this->note(
                 'Docker detected! Using Docker provides isolated Meilisearch instances, easy management, and no local installation needed.',
                 'Meilisearch Setup'
             );
 
-            $useDocker = confirm(
+            $useDocker = $this->confirm(
                 label: 'Would you like to use Docker for Meilisearch? (recommended)',
                 default: true
             );
@@ -146,18 +163,18 @@ trait InteractsWithMeilisearch
                 }
 
                 // Docker setup failed, fall back to local
-                warning('Docker setup failed. Falling back to local Meilisearch setup.');
+                $this->warning('Docker setup failed. Falling back to local Meilisearch setup.');
             }
         } elseif (! $this->isDockerInstalled()) {
             // Docker not installed - offer installation guidance
-            $installDocker = confirm(
+            $installDocker = $this->confirm(
                 label: 'Docker is not installed. Would you like to see installation instructions?',
                 default: false
             );
 
             if ($installDocker) {
                 $this->provideDockerInstallationGuidance();
-                info('After installing Docker, you can recreate this application to use Docker.');
+                $this->info('After installing Docker, you can recreate this application to use Docker.');
             }
         }
 
@@ -207,13 +224,13 @@ trait InteractsWithMeilisearch
         // CONFIGURATION
         // =====================================================================
 
-        info('Configuring Meilisearch...');
+        $this->info('Configuring Meilisearch...');
 
         // Generate secure master key (32 characters hex)
         $masterKey = bin2hex(random_bytes(16));
 
         // Prompt for port configuration
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Meilisearch port',
             placeholder: '7700',
             default: '7700',
@@ -226,7 +243,7 @@ trait InteractsWithMeilisearch
         // GENERATE DOCKER COMPOSE CONFIGURATION
         // =====================================================================
 
-        info('Generating docker-compose.yml configuration...');
+        $this->info('Generating docker-compose.yml configuration...');
 
         $composeGenerated = $this->generateMeilisearchDockerCompose(
             $appPath,
@@ -236,7 +253,7 @@ trait InteractsWithMeilisearch
         );
 
         if (! $composeGenerated) {
-            error('Failed to generate docker-compose.yml configuration');
+            $this->error('Failed to generate docker-compose.yml configuration');
 
             return null;
         }
@@ -245,15 +262,15 @@ trait InteractsWithMeilisearch
         // START CONTAINER
         // =====================================================================
 
-        info('Starting Meilisearch container...');
+        $this->info('Starting Meilisearch container...');
 
-        $started = spin(
+        $started = $this->spin(
             callback: fn (): bool => $this->startDockerContainers($appPath),
             message: 'Starting Meilisearch container...'
         );
 
         if (! $started) {
-            error('Failed to start Meilisearch container');
+            $this->error('Failed to start Meilisearch container');
 
             return null;
         }
@@ -262,26 +279,26 @@ trait InteractsWithMeilisearch
         // WAIT FOR MEILISEARCH TO BE READY
         // =====================================================================
 
-        info('Waiting for Meilisearch to be ready...');
+        $this->info('Waiting for Meilisearch to be ready...');
 
-        $ready = spin(
+        $ready = $this->spin(
             callback: fn (): bool => $this->waitForMeilisearch('http://localhost', $port, $masterKey, 30),
             message: 'Checking Meilisearch health...'
         );
 
         if (! $ready) {
-            warning('Meilisearch may not be fully ready. You may need to wait a moment before using it.');
+            $this->warning('Meilisearch may not be fully ready. You may need to wait a moment before using it.');
         } else {
-            info('✓ Meilisearch is ready!');
+            $this->info('✓ Meilisearch is ready!');
         }
 
         // =====================================================================
         // RETURN CONFIGURATION
         // =====================================================================
 
-        info('✓ Docker Meilisearch setup complete!');
-        info("Meilisearch dashboard: http://localhost:{$port}");
-        info("Master key: {$masterKey}");
+        $this->info('✓ Docker Meilisearch setup complete!');
+        $this->info("Meilisearch dashboard: http://localhost:{$port}");
+        $this->info("Master key: {$masterKey}");
 
         return [
             'meilisearch_host' => 'http://localhost',
@@ -354,16 +371,17 @@ YAML;
         $composePath = $appPath . '/docker-compose.yml';
 
         // Check if docker-compose.yml exists
-        if (file_exists($composePath)) {
-            // Read existing content
-            $existingContent = file_get_contents($composePath);
-            if ($existingContent === false) {
+        if ($this->filesystem()->exists($composePath)) {
+            // Read existing content using Filesystem
+            try {
+                $existingContent = $this->filesystem()->read($composePath);
+            } catch (RuntimeException) {
                 return false;
             }
 
             // Check if Meilisearch service already exists
             if (str_contains($existingContent, 'meilisearch:')) {
-                warning('Meilisearch service already exists in docker-compose.yml');
+                $this->warning('Meilisearch service already exists in docker-compose.yml');
 
                 return true;
             }
@@ -390,8 +408,14 @@ YAML;
                 $existingContent .= "\nvolumes:\n" . $meilisearchVolume;
             }
 
-            // Write updated content
-            return file_put_contents($composePath, $existingContent) !== false;
+            // Write updated content using Filesystem
+            try {
+                $this->filesystem()->write($composePath, $existingContent);
+
+                return true;
+            } catch (RuntimeException) {
+                return false;
+            }
         }
 
         // Create new docker-compose.yml with Meilisearch service
@@ -410,8 +434,14 @@ networks:
 
 YAML;
 
-        // Write docker-compose.yml
-        return file_put_contents($composePath, $composeContent) !== false;
+        // Write docker-compose.yml using Filesystem
+        try {
+            $this->filesystem()->write($composePath, $composeContent);
+
+            return true;
+        } catch (RuntimeException) {
+            return false;
+        }
     }
 
     /**
@@ -457,7 +487,7 @@ YAML;
 
         while ($attempts < $maxAttempts) {
             // Create process to check health endpoint
-            $process = new Process([
+            $process = new SymfonyProcess([
                 'curl',
                 '-f',
                 '-s',
@@ -496,9 +526,14 @@ YAML;
      * Process:
      * 1. Display informational note about local setup
      * 2. Check if user wants to configure manually or use defaults
-     * 3. Prompt for Meilisearch connection details
-     * 4. Generate or prompt for master key
+     * 3. Verify Meilisearch connection if user confirms it's running
+     * 4. Prompt for connection details or provide installation guidance
      * 5. Return configuration array
+     *
+     * Connection verification:
+     * - Tests Meilisearch connection using curl to /health endpoint
+     * - If successful: Continue with setup
+     * - If failed: Offer Docker alternative or show installation instructions
      *
      * Local installation requirements:
      * - Meilisearch must be installed and running
@@ -515,26 +550,100 @@ YAML;
      */
     protected function setupLocalMeilisearch(string $appName): array
     {
-        note(
+        $this->note(
             'Setting up local Meilisearch. Ensure Meilisearch is installed and running.',
             'Local Meilisearch Setup'
         );
 
         // Check if user wants automatic configuration
-        $autoConfig = confirm(
+        $autoConfig = $this->confirm(
             label: 'Is Meilisearch already running locally?',
             default: false
         );
 
-        if (! $autoConfig) {
-            // Provide installation guidance
-            $this->provideMeilisearchInstallationGuidance();
+        if ($autoConfig) {
+            // Verify Meilisearch is actually running
+            $isRunning = $this->spin(
+                callback: fn (): bool => $this->checkMeilisearchConnection('http://localhost', 7700),
+                message: 'Checking Meilisearch connection...'
+            );
 
-            info('After installing and starting Meilisearch, please configure the connection details.');
+            if ($isRunning) {
+                $this->info('✓ Meilisearch is running and accessible!');
+                // Generate a master key for the user
+                $masterKey = bin2hex(random_bytes(16));
+                $this->info("Generated master key: {$masterKey}");
+                $this->info('Please configure Meilisearch with this master key:');
+                $this->info("  meilisearch --master-key=\"{$masterKey}\"");
+
+                // Use default local configuration
+                return [
+                    'meilisearch_host' => 'http://localhost',
+                    'meilisearch_port' => 7700,
+                    'meilisearch_master_key' => $masterKey,
+                    'using_docker' => false,
+                ];
+            }
+
+            // Meilisearch check failed
+            $this->error('✗ Could not connect to Meilisearch on http://localhost:7700');
+            $this->warning('Meilisearch does not appear to be running.');
+
+            // Offer to try Docker if available
+            if ($this->isDockerAvailable()) {
+                $tryDocker = $this->confirm(
+                    label: 'Would you like to use Docker for Meilisearch instead?',
+                    default: true
+                );
+
+                if ($tryDocker) {
+                    $cwd = getcwd();
+                    if ($cwd === false) {
+                        $this->error('Could not determine current working directory');
+                        exit(1);
+                    }
+                    $dockerConfig = $this->setupDockerMeilisearch($appName, $cwd);
+                    if ($dockerConfig !== null) {
+                        return $dockerConfig;
+                    }
+                }
+            }
+
+            // Show installation guidance
+            $this->provideMeilisearchInstallationGuidance();
+            $this->error('Please install and start Meilisearch, then try again.');
+            exit(1);
         }
+
+        // User said Meilisearch is not running - provide installation guidance
+        $this->provideMeilisearchInstallationGuidance();
+        $this->info('After installing and starting Meilisearch, please configure the connection details.');
 
         // Prompt for manual configuration
         return $this->promptMeilisearchConfiguration($appName);
+    }
+
+    /**
+     * Check if Meilisearch is accessible at the given host and port.
+     *
+     * Attempts to connect to Meilisearch and execute a health check to verify
+     * the connection is working. This is a quick health check to ensure
+     * Meilisearch is running and accessible.
+     *
+     * @param  string $host Meilisearch host
+     * @param  int    $port Meilisearch port
+     * @return bool   True if Meilisearch is accessible, false otherwise
+     */
+    protected function checkMeilisearchConnection(string $host, int $port): bool
+    {
+        try {
+            // Try to connect using curl to health endpoint
+            $result = $this->process()->succeeds(['curl', '-f', '-s', "{$host}:{$port}/health"]);
+
+            return $result;
+        } catch (RuntimeException) {
+            return false;
+        }
     }
 
     /**
@@ -562,7 +671,7 @@ YAML;
      * - Service setup
      *
      * Display format:
-     * - Uses Laravel Prompts info() for visibility
+     * - Uses Laravel Prompts $this->info() for visibility
      * - Includes clickable links
      * - Step-by-step instructions
      * - Startup and verification commands
@@ -571,7 +680,7 @@ YAML;
     {
         $os = $this->detectOS();
 
-        note(
+        $this->note(
             'Meilisearch is not running. Meilisearch provides lightning-fast search for your applications.',
             'Meilisearch Not Available'
         );
@@ -602,20 +711,20 @@ YAML;
      */
     protected function provideMacOSMeilisearchGuidance(): void
     {
-        info('macOS Installation:');
-        info('');
-        info('Option 1: Homebrew (Recommended)');
-        info('  brew install meilisearch');
-        info('  meilisearch --master-key="YOUR_MASTER_KEY"');
-        info('');
-        info('Option 2: Direct Download');
-        info('  curl -L https://install.meilisearch.com | sh');
-        info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
-        info('');
-        info('After installation:');
-        info('  1. Start Meilisearch with a master key');
-        info('  2. Verify at: http://localhost:7700/health');
-        info('  3. Documentation: https://docs.meilisearch.com');
+        $this->info('macOS Installation:');
+        $this->info('');
+        $this->info('Option 1: Homebrew (Recommended)');
+        $this->info('  brew install meilisearch');
+        $this->info('  meilisearch --master-key="YOUR_MASTER_KEY"');
+        $this->info('');
+        $this->info('Option 2: Direct Download');
+        $this->info('  curl -L https://install.meilisearch.com | sh');
+        $this->info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Start Meilisearch with a master key');
+        $this->info('  2. Verify at: http://localhost:7700/health');
+        $this->info('  3. Documentation: https://docs.meilisearch.com');
     }
 
     /**
@@ -637,21 +746,21 @@ YAML;
      */
     protected function provideLinuxMeilisearchGuidance(): void
     {
-        info('Linux Installation:');
-        info('');
-        info('Option 1: Installation Script (Recommended)');
-        info('  curl -L https://install.meilisearch.com | sh');
-        info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
-        info('');
-        info('Option 2: Systemd Service');
-        info('  1. Download and install Meilisearch');
-        info('  2. Create systemd service file');
-        info('  3. sudo systemctl start meilisearch');
-        info('');
-        info('After installation:');
-        info('  1. Start Meilisearch with a master key');
-        info('  2. Verify at: http://localhost:7700/health');
-        info('  3. Documentation: https://docs.meilisearch.com');
+        $this->info('Linux Installation:');
+        $this->info('');
+        $this->info('Option 1: Installation Script (Recommended)');
+        $this->info('  curl -L https://install.meilisearch.com | sh');
+        $this->info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
+        $this->info('');
+        $this->info('Option 2: Systemd Service');
+        $this->info('  1. Download and install Meilisearch');
+        $this->info('  2. Create systemd service file');
+        $this->info('  3. sudo systemctl start meilisearch');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Start Meilisearch with a master key');
+        $this->info('  2. Verify at: http://localhost:7700/health');
+        $this->info('  3. Documentation: https://docs.meilisearch.com');
     }
 
     /**
@@ -672,21 +781,21 @@ YAML;
      */
     protected function provideWindowsMeilisearchGuidance(): void
     {
-        info('Windows Installation:');
-        info('');
-        info('Option 1: Direct Download');
-        info('  1. Download from: https://github.com/meilisearch/meilisearch/releases');
-        info('  2. Extract the executable');
-        info('  3. Run: meilisearch.exe --master-key="YOUR_MASTER_KEY"');
-        info('');
-        info('Option 2: PowerShell');
-        info('  Invoke-WebRequest -Uri https://install.meilisearch.com -OutFile install.ps1');
-        info('  ./install.ps1');
-        info('');
-        info('After installation:');
-        info('  1. Start Meilisearch with a master key');
-        info('  2. Verify at: http://localhost:7700/health');
-        info('  3. Documentation: https://docs.meilisearch.com');
+        $this->info('Windows Installation:');
+        $this->info('');
+        $this->info('Option 1: Direct Download');
+        $this->info('  1. Download from: https://github.com/meilisearch/meilisearch/releases');
+        $this->info('  2. Extract the executable');
+        $this->info('  3. Run: meilisearch.exe --master-key="YOUR_MASTER_KEY"');
+        $this->info('');
+        $this->info('Option 2: PowerShell');
+        $this->info('  Invoke-WebRequest -Uri https://install.meilisearch.com -OutFile install.ps1');
+        $this->info('  ./install.ps1');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Start Meilisearch with a master key');
+        $this->info('  2. Verify at: http://localhost:7700/health');
+        $this->info('  3. Documentation: https://docs.meilisearch.com');
     }
 
     /**
@@ -702,17 +811,17 @@ YAML;
      */
     protected function provideGenericMeilisearchGuidance(): void
     {
-        info('Meilisearch Installation:');
-        info('');
-        info('Visit the official Meilisearch documentation:');
-        info('  https://docs.meilisearch.com/learn/getting_started/installation');
-        info('');
-        info('Quick start:');
-        info('  curl -L https://install.meilisearch.com | sh');
-        info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
-        info('');
-        info('After installation, verify with:');
-        info('  curl http://localhost:7700/health');
+        $this->info('Meilisearch Installation:');
+        $this->info('');
+        $this->info('Visit the official Meilisearch documentation:');
+        $this->info('  https://docs.meilisearch.com/learn/getting_started/installation');
+        $this->info('');
+        $this->info('Quick start:');
+        $this->info('  curl -L https://install.meilisearch.com | sh');
+        $this->info('  ./meilisearch --master-key="YOUR_MASTER_KEY"');
+        $this->info('');
+        $this->info('After installation, verify with:');
+        $this->info('  curl http://localhost:7700/health');
     }
 
     /**
@@ -770,7 +879,7 @@ YAML;
         }
 
         // Display informational note about manual configuration
-        note(
+        $this->note(
             'Please enter the connection details for your Meilisearch instance.',
             'Manual Meilisearch Configuration'
         );
@@ -780,7 +889,7 @@ YAML;
         // =====================================================================
 
         // Prompt for Meilisearch host
-        $host = text(
+        $host = $this->text(
             label: 'Meilisearch host',
             placeholder: 'http://localhost',
             default: 'http://localhost',
@@ -789,7 +898,7 @@ YAML;
         );
 
         // Prompt for Meilisearch port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Meilisearch port',
             placeholder: '7700',
             default: '7700',
@@ -802,7 +911,7 @@ YAML;
         // MASTER KEY CONFIGURATION
         // =====================================================================
 
-        $generateKey = confirm(
+        $generateKey = $this->confirm(
             label: 'Generate a new master key?',
             default: true,
             hint: 'A master key is required for Meilisearch authentication'
@@ -811,12 +920,12 @@ YAML;
         if ($generateKey) {
             // Generate secure master key
             $masterKey = bin2hex(random_bytes(16));
-            info("Generated master key: {$masterKey}");
-            info('Please configure Meilisearch with this master key:');
-            info("  meilisearch --master-key=\"{$masterKey}\"");
+            $this->info("Generated master key: {$masterKey}");
+            $this->info('Please configure Meilisearch with this master key:');
+            $this->info("  meilisearch --master-key=\"{$masterKey}\"");
         } else {
             // Prompt for existing master key
-            $masterKey = text(
+            $masterKey = $this->text(
                 label: 'Meilisearch master key',
                 placeholder: 'Enter your existing master key',
                 required: true,

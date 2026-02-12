@@ -4,16 +4,10 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\password;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
-
-use Symfony\Component\Process\Process;
+use PhpHive\Cli\Support\Filesystem;
+use PhpHive\Cli\Support\Process;
+use RuntimeException;
+use Symfony\Component\Process\Process as SymfonyProcess;
 
 /**
  * Minio Interaction Trait.
@@ -97,6 +91,28 @@ use Symfony\Component\Process\Process;
 trait InteractsWithMinio
 {
     /**
+     * Get the Process service instance.
+     *
+     * This method provides access to the Process service for command execution.
+     * It should be implemented by the class using this trait to return the
+     * appropriate Process instance from the dependency injection container.
+     *
+     * @return Process The Process service instance
+     */
+    abstract protected function process(): Process;
+
+    /**
+     * Get the Filesystem service instance.
+     *
+     * This method provides access to the Filesystem service for file operations.
+     * It should be implemented by the class using this trait to return the
+     * appropriate Filesystem instance from the dependency injection container.
+     *
+     * @return Filesystem The Filesystem service instance
+     */
+    abstract protected function filesystem(): Filesystem;
+
+    /**
      * Orchestrate Minio setup with Docker-first approach.
      *
      * This is the main entry point for Minio setup. It intelligently
@@ -135,12 +151,12 @@ trait InteractsWithMinio
         // Check if Docker is available (requires InteractsWithDocker trait)
         if ($this->isDockerAvailable()) {
             // Docker is available - offer Docker setup
-            note(
+            $this->note(
                 'Docker detected! Using Docker provides isolated Minio storage, easy management, and includes web console.',
                 'Minio Setup'
             );
 
-            $useDocker = confirm(
+            $useDocker = $this->confirm(
                 label: 'Would you like to use Docker for Minio? (recommended)',
                 default: true
             );
@@ -152,18 +168,18 @@ trait InteractsWithMinio
                 }
 
                 // Docker setup failed, fall back to local
-                warning('Docker setup failed. Falling back to local Minio setup.');
+                $this->warning('Docker setup failed. Falling back to local Minio setup.');
             }
         } elseif (! $this->isDockerInstalled()) {
             // Docker not installed - offer installation guidance
-            $installDocker = confirm(
+            $installDocker = $this->confirm(
                 label: 'Docker is not installed. Would you like to see installation instructions?',
                 default: false
             );
 
             if ($installDocker) {
                 $this->provideDockerInstallationGuidance();
-                info('After installing Docker, you can recreate this application to use Docker.');
+                $this->info('After installing Docker, you can recreate this application to use Docker.');
             }
         }
 
@@ -213,7 +229,7 @@ trait InteractsWithMinio
         // CONFIGURATION
         // =====================================================================
 
-        info('Configuring Minio object storage...');
+        $this->info('Configuring Minio object storage...');
 
         $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '-', $appName) ?? $appName);
 
@@ -221,11 +237,11 @@ trait InteractsWithMinio
         $accessKey = $this->generateMinioAccessKey();
         $secretKey = $this->generateMinioSecretKey();
 
-        info("Generated access key: {$accessKey}");
-        info('Generated secret key: ' . str_repeat('*', strlen($secretKey)));
+        $this->info("Generated access key: {$accessKey}");
+        $this->info('Generated secret key: ' . str_repeat('*', strlen($secretKey)));
 
         // Prompt for bucket name
-        $bucketName = text(
+        $bucketName = $this->text(
             label: 'Default bucket name',
             default: $normalizedName,
             required: true,
@@ -239,7 +255,7 @@ trait InteractsWithMinio
         // GENERATE DOCKER COMPOSE FILE
         // =====================================================================
 
-        info('Generating docker-compose.yml for Minio...');
+        $this->info('Generating docker-compose.yml for Minio...');
 
         $composeGenerated = $this->generateMinioDockerComposeFile(
             $appPath,
@@ -249,7 +265,7 @@ trait InteractsWithMinio
         );
 
         if (! $composeGenerated) {
-            error('Failed to generate docker-compose.yml');
+            $this->error('Failed to generate docker-compose.yml');
 
             return null;
         }
@@ -258,15 +274,15 @@ trait InteractsWithMinio
         // START CONTAINERS
         // =====================================================================
 
-        info('Starting Minio Docker container...');
+        $this->info('Starting Minio Docker container...');
 
-        $started = spin(
+        $started = $this->spin(
             callback: fn (): bool => $this->startDockerContainers($appPath),
             message: 'Starting Minio container...'
         );
 
         if (! $started) {
-            error('Failed to start Minio Docker container');
+            $this->error('Failed to start Minio Docker container');
 
             return null;
         }
@@ -275,26 +291,26 @@ trait InteractsWithMinio
         // WAIT FOR MINIO
         // =====================================================================
 
-        info('Waiting for Minio to be ready...');
+        $this->info('Waiting for Minio to be ready...');
 
-        $ready = spin(
+        $ready = $this->spin(
             callback: fn (): bool => $this->waitForDockerService($appPath, 'minio', 30),
             message: 'Waiting for Minio...'
         );
 
         if (! $ready) {
-            warning('Minio may not be fully ready. You may need to wait a moment before using it.');
+            $this->warning('Minio may not be fully ready. You may need to wait a moment before using it.');
         } else {
-            info('✓ Minio is ready!');
+            $this->info('✓ Minio is ready!');
         }
 
         // =====================================================================
         // CREATE DEFAULT BUCKET
         // =====================================================================
 
-        info('Creating default bucket...');
+        $this->info('Creating default bucket...');
 
-        $bucketCreated = spin(
+        $bucketCreated = $this->spin(
             callback: fn (): bool => $this->createMinioBucket(
                 $appPath,
                 $bucketName,
@@ -305,18 +321,18 @@ trait InteractsWithMinio
         );
 
         if (! $bucketCreated) {
-            warning("Failed to create bucket '{$bucketName}'. You can create it manually via Console.");
+            $this->warning("Failed to create bucket '{$bucketName}'. You can create it manually via Console.");
         } else {
-            info("✓ Bucket '{$bucketName}' created successfully!");
+            $this->info("✓ Bucket '{$bucketName}' created successfully!");
         }
 
         // =====================================================================
         // RETURN CONFIGURATION
         // =====================================================================
 
-        info('✓ Docker Minio setup complete!');
-        info('Minio Console: http://localhost:9001');
-        info("Login with access key: {$accessKey}");
+        $this->info('✓ Docker Minio setup complete!');
+        $this->info('Minio Console: http://localhost:9001');
+        $this->info("Login with access key: {$accessKey}");
 
         return [
             'minio_endpoint' => 'localhost',
@@ -361,13 +377,14 @@ trait InteractsWithMinio
         // Get template path
         $templatePath = dirname(__DIR__, 2) . '/stubs/docker/minio.yml';
 
-        if (! file_exists($templatePath)) {
+        if (! $this->filesystem()->exists($templatePath)) {
             // If template doesn't exist, create inline
             $template = $this->getMinioDockerComposeTemplate();
         } else {
-            // Read template
-            $template = file_get_contents($templatePath);
-            if ($template === false) {
+            // Read template using Filesystem
+            try {
+                $template = $this->filesystem()->read($templatePath);
+            } catch (RuntimeException) {
                 return false;
             }
         }
@@ -392,16 +409,17 @@ trait InteractsWithMinio
         $outputPath = $appPath . '/docker-compose.yml';
 
         // Check if docker-compose.yml already exists
-        if (file_exists($outputPath)) {
-            // Append to existing file
-            $existingContent = file_get_contents($outputPath);
-            if ($existingContent === false) {
+        if ($this->filesystem()->exists($outputPath)) {
+            // Append to existing file using Filesystem
+            try {
+                $existingContent = $this->filesystem()->read($outputPath);
+            } catch (RuntimeException) {
                 return false;
             }
 
             // Check if Minio service already exists
             if (str_contains($existingContent, 'minio:')) {
-                warning('Minio service already exists in docker-compose.yml');
+                $this->warning('Minio service already exists in docker-compose.yml');
 
                 return true;
             }
@@ -410,7 +428,14 @@ trait InteractsWithMinio
             $content = $existingContent . "\n" . $content;
         }
 
-        return file_put_contents($outputPath, $content) !== false;
+        // Write docker-compose.yml using Filesystem
+        try {
+            $this->filesystem()->write($outputPath, $content);
+
+            return true;
+        } catch (RuntimeException) {
+            return false;
+        }
     }
 
     /**
@@ -492,7 +517,7 @@ YAML;
         string $secretKey
     ): bool {
         // Configure mc alias
-        $aliasProcess = new Process([
+        $aliasProcess = new SymfonyProcess([
             'docker',
             'compose',
             'exec',
@@ -514,7 +539,7 @@ YAML;
         }
 
         // Create bucket
-        $bucketProcess = new Process([
+        $bucketProcess = new SymfonyProcess([
             'docker',
             'compose',
             'exec',
@@ -543,8 +568,15 @@ YAML;
      *
      * Process:
      * 1. Display informational note about local setup
-     * 2. Prompt for Minio server details
-     * 3. Return configuration for application
+     * 2. Check if user wants to configure manually or use defaults
+     * 3. Verify Minio connection if user confirms it's running
+     * 4. Prompt for connection details or provide installation guidance
+     * 5. Return configuration for application
+     *
+     * Connection verification:
+     * - Tests Minio connection using curl to /minio/health/live endpoint
+     * - If successful: Continue with setup
+     * - If failed: Offer Docker alternative or show installation instructions
      *
      * Note: This method assumes Minio is already installed and running
      * locally. It does not install or start Minio.
@@ -554,27 +586,194 @@ YAML;
      */
     protected function setupLocalMinio(string $appName): array
     {
-        note(
+        $this->note(
             'Setting up local Minio. Ensure Minio is installed and running.',
             'Local Minio Setup'
         );
 
-        info('Download Minio from: https://min.io/download');
-        info('Start Minio with: minio server /data --console-address ":9001"');
-
-        $hasLocal = confirm(
-            label: 'Do you have Minio running locally?',
+        // Check if user wants automatic configuration
+        $hasLocal = $this->confirm(
+            label: 'Is Minio already running locally?',
             default: false
         );
 
         if ($hasLocal) {
-            return $this->promptMinioConfiguration($appName);
+            // Verify Minio is actually running
+            $isRunning = $this->spin(
+                callback: fn (): bool => $this->checkMinioConnection('localhost', 9000),
+                message: 'Checking Minio connection...'
+            );
+
+            if ($isRunning) {
+                $this->info('✓ Minio is running and accessible!');
+                // Use default local configuration
+                $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '-', $appName) ?? $appName);
+
+                return [
+                    'minio_endpoint' => 'localhost',
+                    'minio_port' => 9000,
+                    'minio_access_key' => 'minioadmin',
+                    'minio_secret_key' => 'minioadmin',
+                    'minio_bucket' => $normalizedName,
+                    'minio_console_port' => 9001,
+                    'using_docker' => false,
+                ];
+            }
+
+            // Minio check failed
+            $this->error('✗ Could not connect to Minio on localhost:9000');
+            $this->warning('Minio does not appear to be running.');
+
+            // Offer to try Docker if available
+            if ($this->isDockerAvailable()) {
+                $tryDocker = $this->confirm(
+                    label: 'Would you like to use Docker for Minio instead?',
+                    default: true
+                );
+
+                if ($tryDocker) {
+                    $cwd = getcwd();
+                    if ($cwd === false) {
+                        $this->error('Could not determine current working directory');
+                        exit(1);
+                    }
+                    $dockerConfig = $this->setupDockerMinio($appName, $cwd);
+                    if ($dockerConfig !== null) {
+                        return $dockerConfig;
+                    }
+                }
+            }
+
+            // Show installation guidance
+            $this->provideMinioInstallationGuidance();
+            $this->error('Please install and start Minio, then try again.');
+            exit(1);
         }
 
-        // User doesn't have local Minio, provide manual configuration
-        warning('Please install and start Minio, then configure manually.');
+        // User said Minio is not running - provide installation guidance
+        $this->info('Download Minio from: https://min.io/download');
+        $this->info('Start Minio with: minio server /data --console-address ":9001"');
+        $this->provideMinioInstallationGuidance();
+        $this->info('After installing and starting Minio, please configure the connection details.');
 
+        // Prompt for manual configuration
         return $this->promptMinioConfiguration($appName);
+    }
+
+    /**
+     * Check if Minio is accessible at the given host and port.
+     *
+     * Attempts to connect to Minio and execute a health check to verify
+     * the connection is working. This is a quick health check to ensure
+     * Minio is running and accessible.
+     *
+     * @param  string $host Minio host
+     * @param  int    $port Minio port
+     * @return bool   True if Minio is accessible, false otherwise
+     */
+    protected function checkMinioConnection(string $host, int $port): bool
+    {
+        try {
+            // Try to connect using curl to health endpoint
+            $result = $this->process()->succeeds(['curl', '-f', '-s', "http://{$host}:{$port}/minio/health/live"]);
+
+            return $result;
+        } catch (RuntimeException) {
+            return false;
+        }
+    }
+
+    /**
+     * Provide Minio installation guidance based on operating system.
+     *
+     * Displays helpful information and instructions for installing Minio
+     * on the user's operating system. Includes download links, installation
+     * methods, and verification steps.
+     */
+    protected function provideMinioInstallationGuidance(): void
+    {
+        $os = $this->detectOS();
+
+        $this->note(
+            'Minio is not running. Minio provides S3-compatible object storage.',
+            'Minio Not Available'
+        );
+
+        match ($os) {
+            'macos' => $this->provideMacOSMinioGuidance(),
+            'linux' => $this->provideLinuxMinioGuidance(),
+            'windows' => $this->provideWindowsMinioGuidance(),
+            default => $this->provideGenericMinioGuidance(),
+        };
+    }
+
+    /**
+     * Provide macOS-specific Minio installation guidance.
+     */
+    protected function provideMacOSMinioGuidance(): void
+    {
+        $this->info('macOS Installation:');
+        $this->info('');
+        $this->info('Homebrew (Recommended):');
+        $this->info('  brew install minio/stable/minio');
+        $this->info('  minio server /data --console-address ":9001"');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Minio will start on port 9000');
+        $this->info('  2. Console UI on port 9001');
+        $this->info('  3. Verify with: curl http://localhost:9000/minio/health/live');
+        $this->info('  4. Documentation: https://min.io/docs');
+    }
+
+    /**
+     * Provide Linux-specific Minio installation guidance.
+     */
+    protected function provideLinuxMinioGuidance(): void
+    {
+        $this->info('Linux Installation:');
+        $this->info('');
+        $this->info('Download and Install:');
+        $this->info('  wget https://dl.min.io/server/minio/release/linux-amd64/minio');
+        $this->info('  chmod +x minio');
+        $this->info('  ./minio server /data --console-address ":9001"');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Minio will start on port 9000');
+        $this->info('  2. Console UI on port 9001');
+        $this->info('  3. Verify with: curl http://localhost:9000/minio/health/live');
+        $this->info('  4. Documentation: https://min.io/docs');
+    }
+
+    /**
+     * Provide Windows-specific Minio installation guidance.
+     */
+    protected function provideWindowsMinioGuidance(): void
+    {
+        $this->info('Windows Installation:');
+        $this->info('');
+        $this->info('Download and Install:');
+        $this->info('  1. Download from: https://dl.min.io/server/minio/release/windows-amd64/minio.exe');
+        $this->info('  2. Run: minio.exe server C:\\data --console-address ":9001"');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Minio will start on port 9000');
+        $this->info('  2. Console UI on port 9001');
+        $this->info('  3. Verify with: curl http://localhost:9000/minio/health/live');
+        $this->info('  4. Documentation: https://min.io/docs');
+    }
+
+    /**
+     * Provide generic Minio installation guidance.
+     */
+    protected function provideGenericMinioGuidance(): void
+    {
+        $this->info('Minio Installation:');
+        $this->info('');
+        $this->info('Visit the official Minio documentation:');
+        $this->info('  https://min.io/docs/minio/linux/operations/installation.html');
+        $this->info('');
+        $this->info('After installation, verify with:');
+        $this->info('  curl http://localhost:9000/minio/health/live');
     }
 
     /**
@@ -643,7 +842,7 @@ YAML;
         }
 
         // Display informational note about manual setup
-        note(
+        $this->note(
             'Please enter the connection details for your Minio server.',
             'Manual Minio Configuration'
         );
@@ -653,7 +852,7 @@ YAML;
         // =====================================================================
 
         // Prompt for Minio endpoint
-        $endpoint = text(
+        $endpoint = $this->text(
             label: 'Minio endpoint',
             placeholder: 'localhost',
             default: 'localhost',
@@ -662,7 +861,7 @@ YAML;
         );
 
         // Prompt for Minio port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Minio API port',
             placeholder: '9000',
             default: '9000',
@@ -672,7 +871,7 @@ YAML;
         $port = (int) $portInput;
 
         // Prompt for access key
-        $accessKey = text(
+        $accessKey = $this->text(
             label: 'Minio access key',
             placeholder: 'minioadmin',
             default: 'minioadmin',
@@ -681,7 +880,7 @@ YAML;
         );
 
         // Prompt for secret key
-        $secretKey = password(
+        $secretKey = $this->password(
             label: 'Minio secret key',
             placeholder: 'Enter secret key',
             required: true,
@@ -689,7 +888,7 @@ YAML;
         );
 
         // Prompt for bucket name
-        $bucketName = text(
+        $bucketName = $this->text(
             label: 'Default bucket name',
             placeholder: $normalizedName,
             default: $normalizedName,
@@ -701,7 +900,7 @@ YAML;
         $bucketName = $this->validateBucketName($bucketName);
 
         // Prompt for console port
-        $consolePortInput = text(
+        $consolePortInput = $this->text(
             label: 'Minio Console port',
             placeholder: '9001',
             default: '9001',

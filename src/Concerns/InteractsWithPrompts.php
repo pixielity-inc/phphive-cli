@@ -6,6 +6,7 @@ namespace PhpHive\Cli\Concerns;
 
 use Closure;
 
+use function Laravel\Prompts\clear;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
@@ -75,6 +76,18 @@ use function Laravel\Prompts\warning;
  */
 trait InteractsWithPrompts
 {
+    /**
+     * Clear the terminal screen.
+     *
+     * Clears all previous output from the terminal, providing a clean
+     * slate for new output. Useful for creating a fresh view or
+     * removing clutter before displaying important information.
+     */
+    protected function clear(): void
+    {
+        clear();
+    }
+
     /**
      * Display an intro message to start a command flow.
      *

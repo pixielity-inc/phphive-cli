@@ -4,16 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\password;
-use function Laravel\Prompts\select;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
-
 use PhpHive\Cli\Support\Filesystem;
 use PhpHive\Cli\Support\Process;
 use RuntimeException;
@@ -165,12 +155,12 @@ trait InteractsWithElasticsearch
 
         if ($this->isDockerAvailable()) {
             // Docker is available - offer Docker setup
-            note(
+            $this->note(
                 'Docker detected! Using Docker provides isolated Elasticsearch, easy management, and no local installation needed.',
                 'Elasticsearch Setup'
             );
 
-            $useDocker = confirm(
+            $useDocker = $this->confirm(
                 label: 'Would you like to use Docker for Elasticsearch? (recommended)',
                 default: true
             );
@@ -182,19 +172,19 @@ trait InteractsWithElasticsearch
                 }
 
                 // Docker setup failed, fall back to local
-                warning('Docker setup failed. Falling back to local Elasticsearch setup.');
+                $this->warning('Docker setup failed. Falling back to local Elasticsearch setup.');
             }
 
         } elseif (! $this->isDockerInstalled()) {
             // Docker not installed - offer installation guidance
-            $installDocker = confirm(
+            $installDocker = $this->confirm(
                 label: 'Docker is not installed. Would you like to see installation instructions?',
                 default: false
             );
 
             if ($installDocker) {
                 $this->provideDockerInstallationGuidance();
-                info('After installing Docker, you can recreate this application to use Docker.');
+                $this->info('After installing Docker, you can recreate this application to use Docker.');
             }
         }
 
@@ -245,7 +235,7 @@ trait InteractsWithElasticsearch
         // ELASTICSEARCH VERSION SELECTION
         // =====================================================================
 
-        $esVersion = (string) select(
+        $esVersion = (string) $this->select(
             label: 'Select Elasticsearch version',
             options: [
                 '7' => 'Elasticsearch 7.x (Stable, widely used)',
@@ -258,7 +248,7 @@ trait InteractsWithElasticsearch
         // OPTIONAL SERVICES
         // =====================================================================
 
-        $includeKibana = confirm(
+        $includeKibana = $this->confirm(
             label: 'Include Kibana for visualization and management?',
             default: true
         );
@@ -272,13 +262,13 @@ trait InteractsWithElasticsearch
         // Generate secure password for Elasticsearch
         $esPassword = bin2hex(random_bytes(16));
 
-        info('Generated secure password for Elasticsearch');
+        $this->info('Generated secure password for Elasticsearch');
 
         // =====================================================================
         // GENERATE DOCKER COMPOSE FILE
         // =====================================================================
 
-        info('Generating docker-compose.yml for Elasticsearch...');
+        $this->info('Generating docker-compose.yml for Elasticsearch...');
 
         $composeGenerated = $this->generateElasticsearchDockerComposeFile(
             $appPath,
@@ -289,7 +279,7 @@ trait InteractsWithElasticsearch
         );
 
         if (! $composeGenerated) {
-            error('Failed to generate docker-compose.yml');
+            $this->error('Failed to generate docker-compose.yml');
 
             return null;
         }
@@ -298,15 +288,15 @@ trait InteractsWithElasticsearch
         // START CONTAINERS
         // =====================================================================
 
-        info('Starting Docker containers...');
+        $this->info('Starting Docker containers...');
 
-        $started = spin(
+        $started = $this->spin(
             callback: fn (): bool => $this->startDockerContainers($appPath),
             message: 'Starting containers...'
         );
 
         if (! $started) {
-            error('Failed to start Docker containers');
+            $this->error('Failed to start Docker containers');
 
             return null;
         }
@@ -315,27 +305,27 @@ trait InteractsWithElasticsearch
         // WAIT FOR ELASTICSEARCH
         // =====================================================================
 
-        info('Waiting for Elasticsearch to be ready...');
+        $this->info('Waiting for Elasticsearch to be ready...');
 
-        $ready = spin(
+        $ready = $this->spin(
             callback: fn (): bool => $this->waitForElasticsearchHealth($appPath, 'elasticsearch', 60),
             message: 'Waiting for Elasticsearch health check...'
         );
 
         if (! $ready) {
-            warning('Elasticsearch may not be fully ready. You may need to wait a moment before using it.');
+            $this->warning('Elasticsearch may not be fully ready. You may need to wait a moment before using it.');
         } else {
-            info('✓ Elasticsearch is ready!');
+            $this->info('✓ Elasticsearch is ready!');
         }
 
         // =====================================================================
         // RETURN CONFIGURATION
         // =====================================================================
 
-        info('✓ Docker Elasticsearch setup complete!');
+        $this->info('✓ Docker Elasticsearch setup complete!');
         if ($includeKibana) {
-            info('Kibana UI: http://localhost:5601');
-            info('Login with username: elastic, password: ' . $esPassword);
+            $this->info('Kibana UI: http://localhost:5601');
+            $this->info('Login with username: elastic, password: ' . $esPassword);
         }
 
         return [
@@ -674,25 +664,203 @@ trait InteractsWithElasticsearch
      *
      * Process:
      * 1. Display informational note about local setup
-     * 2. Prompt for Elasticsearch connection details
-     * 3. Return configuration array
+     * 2. Check if user wants to configure manually or use defaults
+     * 3. Verify Elasticsearch connection if user confirms it's running
+     * 4. Prompt for connection details or provide installation guidance
+     * 5. Return configuration array
      *
-     * No validation:
-     * - This method does NOT test the Elasticsearch connection
-     * - Assumes user has Elasticsearch running locally
-     * - Application will fail if connection details are incorrect
+     * Connection verification:
+     * - Tests Elasticsearch connection using curl to /_cluster/health
+     * - If successful: Continue with setup
+     * - If failed: Offer Docker alternative or show installation instructions
      *
      * @param  string $appName Application name (used for context)
      * @return array  Elasticsearch configuration array
      */
     protected function setupLocalElasticsearch(string $appName): array
     {
-        note(
+        $this->note(
             'Setting up local Elasticsearch connection. Ensure Elasticsearch is installed and running.',
             'Local Elasticsearch Setup'
         );
 
+        // Check if user wants automatic configuration
+        $autoConfig = $this->confirm(
+            label: 'Is Elasticsearch already running locally?',
+            default: false
+        );
+
+        if ($autoConfig) {
+            // Verify Elasticsearch is actually running
+            $isRunning = $this->spin(
+                callback: fn (): bool => $this->checkElasticsearchConnection('localhost', 9200),
+                message: 'Checking Elasticsearch connection...'
+            );
+
+            if ($isRunning) {
+                $this->info('✓ Elasticsearch is running and accessible!');
+
+                // Use default local configuration
+                return [
+                    'elasticsearch_host' => 'localhost',
+                    'elasticsearch_port' => 9200,
+                    'elasticsearch_user' => 'elastic',
+                    'elasticsearch_password' => '',
+                    'using_docker' => false,
+                ];
+            }
+
+            // Elasticsearch check failed
+            $this->error('✗ Could not connect to Elasticsearch on localhost:9200');
+            $this->warning('Elasticsearch does not appear to be running.');
+
+            // Offer to try Docker if available
+            if ($this->isDockerAvailable()) {
+                $tryDocker = $this->confirm(
+                    label: 'Would you like to use Docker for Elasticsearch instead?',
+                    default: true
+                );
+
+                if ($tryDocker) {
+                    $cwd = getcwd();
+                    if ($cwd === false) {
+                        $this->error('Could not determine current working directory');
+                        exit(1);
+                    }
+                    $dockerConfig = $this->setupDockerElasticsearch($appName, $cwd);
+                    if ($dockerConfig !== null) {
+                        return $dockerConfig;
+                    }
+                }
+            }
+
+            // Show installation guidance
+            $this->provideElasticsearchInstallationGuidance();
+            $this->error('Please install and start Elasticsearch, then try again.');
+            exit(1);
+        }
+
+        // User said Elasticsearch is not running - provide installation guidance
+        $this->provideElasticsearchInstallationGuidance();
+        $this->info('After installing and starting Elasticsearch, please configure the connection details.');
+
+        // Prompt for manual configuration
         return $this->promptElasticsearchConfiguration($appName);
+    }
+
+    /**
+     * Check if Elasticsearch is accessible at the given host and port.
+     *
+     * Attempts to connect to Elasticsearch and execute a health check to verify
+     * the connection is working. This is a quick health check to ensure
+     * Elasticsearch is running and accessible.
+     *
+     * @param  string $host Elasticsearch host
+     * @param  int    $port Elasticsearch port
+     * @return bool   True if Elasticsearch is accessible, false otherwise
+     */
+    protected function checkElasticsearchConnection(string $host, int $port): bool
+    {
+        try {
+            // Try to connect using curl to cluster health endpoint
+            $result = $this->process()->succeeds(['curl', '-f', '-s', "http://{$host}:{$port}/_cluster/health"]);
+
+            return $result;
+        } catch (RuntimeException) {
+            return false;
+        }
+    }
+
+    /**
+     * Provide Elasticsearch installation guidance based on operating system.
+     *
+     * Displays helpful information and instructions for installing Elasticsearch
+     * on the user's operating system. Includes download links, installation
+     * methods, and verification steps.
+     */
+    protected function provideElasticsearchInstallationGuidance(): void
+    {
+        $os = $this->detectOS();
+
+        $this->note(
+            'Elasticsearch is not running. Elasticsearch provides powerful search capabilities.',
+            'Elasticsearch Not Available'
+        );
+
+        match ($os) {
+            'macos' => $this->provideMacOSElasticsearchGuidance(),
+            'linux' => $this->provideLinuxElasticsearchGuidance(),
+            'windows' => $this->provideWindowsElasticsearchGuidance(),
+            default => $this->provideGenericElasticsearchGuidance(),
+        };
+    }
+
+    /**
+     * Provide macOS-specific Elasticsearch installation guidance.
+     */
+    protected function provideMacOSElasticsearchGuidance(): void
+    {
+        $this->info('macOS Installation:');
+        $this->info('');
+        $this->info('Homebrew (Recommended):');
+        $this->info('  brew tap elastic/tap');
+        $this->info('  brew install elastic/tap/elasticsearch-full');
+        $this->info('  brew services start elastic/tap/elasticsearch-full');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Elasticsearch will start automatically');
+        $this->info('  2. Verify with: curl http://localhost:9200');
+        $this->info('  3. Documentation: https://www.elastic.co/guide');
+    }
+
+    /**
+     * Provide Linux-specific Elasticsearch installation guidance.
+     */
+    protected function provideLinuxElasticsearchGuidance(): void
+    {
+        $this->info('Linux Installation:');
+        $this->info('');
+        $this->info('Ubuntu/Debian:');
+        $this->info('  wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -');
+        $this->info('  sudo apt-get install apt-transport-https');
+        $this->info('  echo "deb https://artifacts.elastic.co/packages/8.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-8.x.list');
+        $this->info('  sudo apt-get update && sudo apt-get install elasticsearch');
+        $this->info('  sudo systemctl start elasticsearch');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Verify with: curl http://localhost:9200');
+        $this->info('  2. Documentation: https://www.elastic.co/guide');
+    }
+
+    /**
+     * Provide Windows-specific Elasticsearch installation guidance.
+     */
+    protected function provideWindowsElasticsearchGuidance(): void
+    {
+        $this->info('Windows Installation:');
+        $this->info('');
+        $this->info('Option 1: Download and Install:');
+        $this->info('  1. Download from: https://www.elastic.co/downloads/elasticsearch');
+        $this->info('  2. Extract the archive');
+        $this->info('  3. Run bin\\elasticsearch.bat');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Verify with: curl http://localhost:9200');
+        $this->info('  2. Documentation: https://www.elastic.co/guide');
+    }
+
+    /**
+     * Provide generic Elasticsearch installation guidance.
+     */
+    protected function provideGenericElasticsearchGuidance(): void
+    {
+        $this->info('Elasticsearch Installation:');
+        $this->info('');
+        $this->info('Visit the official Elasticsearch documentation:');
+        $this->info('  https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html');
+        $this->info('');
+        $this->info('After installation, verify with:');
+        $this->info('  curl http://localhost:9200');
     }
 
     /**
@@ -744,7 +912,7 @@ trait InteractsWithElasticsearch
         }
 
         // Display informational note
-        note(
+        $this->note(
             'Please enter the connection details for your Elasticsearch instance.',
             'Elasticsearch Configuration'
         );
@@ -754,7 +922,7 @@ trait InteractsWithElasticsearch
         // =====================================================================
 
         // Prompt for Elasticsearch host
-        $host = text(
+        $host = $this->text(
             label: 'Elasticsearch host',
             placeholder: 'localhost',
             default: 'localhost',
@@ -763,7 +931,7 @@ trait InteractsWithElasticsearch
         );
 
         // Prompt for Elasticsearch port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Elasticsearch port',
             placeholder: '9200',
             default: '9200',
@@ -773,7 +941,7 @@ trait InteractsWithElasticsearch
         $port = (int) $portInput;
 
         // Prompt for Elasticsearch username
-        $user = text(
+        $user = $this->text(
             label: 'Elasticsearch username',
             placeholder: 'elastic',
             default: 'elastic',
@@ -782,7 +950,7 @@ trait InteractsWithElasticsearch
         );
 
         // Prompt for Elasticsearch password
-        $password = password(
+        $password = $this->password(
             label: 'Elasticsearch password',
             placeholder: 'Enter password',
             required: false,

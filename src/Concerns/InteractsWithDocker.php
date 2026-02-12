@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-
 use PhpHive\Cli\Support\Process;
 
 /**
@@ -54,7 +51,7 @@ use PhpHive\Cli\Support\Process;
  *
  *         // Check Docker availability
  *         if ($this->isDockerAvailable()) {
- *             $useDocker = confirm('Use Docker for database?', true);
+ *             $useDocker = $this->confirm('Use Docker for database?', true);
  *             if ($useDocker) {
  *                 return $this->setupDockerDatabase('my-app');
  *             }
@@ -304,7 +301,7 @@ trait InteractsWithDocker
      * - Download link and setup guide
      *
      * Display format:
-     * - Uses Laravel Prompts note() for visibility
+     * - Uses Laravel Prompts $this->note() for visibility
      * - Includes clickable links
      * - Step-by-step instructions
      * - Verification commands
@@ -313,7 +310,7 @@ trait InteractsWithDocker
     {
         $os = $this->detectOS();
 
-        note(
+        $this->note(
             'Docker is not installed or not running. Docker provides isolated database containers for your applications.',
             'Docker Not Available'
         );
@@ -344,17 +341,17 @@ trait InteractsWithDocker
      */
     protected function provideMacOSInstallationGuidance(): void
     {
-        info('macOS Installation:');
-        info('');
-        info('Option 1: Docker Desktop (Recommended)');
-        info('  1. Download from: https://www.docker.com/products/docker-desktop');
-        info('  2. Install and start Docker Desktop');
-        info('  3. Wait for Docker to start (whale icon in menu bar)');
-        info('');
-        info('Option 2: Homebrew');
-        info('  brew install --cask docker');
-        info('');
-        info('After installation, verify with: docker --version');
+        $this->info('macOS Installation:');
+        $this->info('');
+        $this->info('Option 1: Docker Desktop (Recommended)');
+        $this->info('  1. Download from: https://www.docker.com/products/docker-desktop');
+        $this->info('  2. Install and start Docker Desktop');
+        $this->info('  3. Wait for Docker to start (whale icon in menu bar)');
+        $this->info('');
+        $this->info('Option 2: Homebrew');
+        $this->info('  brew install --cask docker');
+        $this->info('');
+        $this->info('After installation, verify with: docker --version');
     }
 
     /**
@@ -376,21 +373,21 @@ trait InteractsWithDocker
      */
     protected function provideLinuxInstallationGuidance(): void
     {
-        info('Linux Installation:');
-        info('');
-        info('Ubuntu/Debian:');
-        info('  curl -fsSL https://get.docker.com -o get-docker.sh');
-        info('  sudo sh get-docker.sh');
-        info('  sudo usermod -aG docker $USER');
-        info('  sudo systemctl start docker');
-        info('');
-        info('Fedora/RHEL/CentOS:');
-        info('  sudo dnf install docker-ce docker-ce-cli containerd.io');
-        info('  sudo systemctl start docker');
-        info('');
-        info('After installation:');
-        info('  1. Log out and back in (for docker group)');
-        info('  2. Verify with: docker --version');
+        $this->info('Linux Installation:');
+        $this->info('');
+        $this->info('Ubuntu/Debian:');
+        $this->info('  curl -fsSL https://get.docker.com -o get-docker.sh');
+        $this->info('  sudo sh get-docker.sh');
+        $this->info('  sudo usermod -aG docker $USER');
+        $this->info('  sudo systemctl start docker');
+        $this->info('');
+        $this->info('Fedora/RHEL/CentOS:');
+        $this->info('  sudo dnf install docker-ce docker-ce-cli containerd.io');
+        $this->info('  sudo systemctl start docker');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Log out and back in (for docker group)');
+        $this->info('  2. Verify with: docker --version');
     }
 
     /**
@@ -412,18 +409,18 @@ trait InteractsWithDocker
      */
     protected function provideWindowsInstallationGuidance(): void
     {
-        info('Windows Installation:');
-        info('');
-        info('Requirements:');
-        info('  - Windows 10/11 (64-bit)');
-        info('  - WSL2 enabled');
-        info('  - Virtualization enabled in BIOS');
-        info('');
-        info('Installation:');
-        info('  1. Enable WSL2: wsl --install');
-        info('  2. Download Docker Desktop: https://www.docker.com/products/docker-desktop');
-        info('  3. Install and start Docker Desktop');
-        info('  4. Verify with: docker --version');
+        $this->info('Windows Installation:');
+        $this->info('');
+        $this->info('Requirements:');
+        $this->info('  - Windows 10/11 (64-bit)');
+        $this->info('  - WSL2 enabled');
+        $this->info('  - Virtualization enabled in BIOS');
+        $this->info('');
+        $this->info('Installation:');
+        $this->info('  1. Enable WSL2: wsl --install');
+        $this->info('  2. Download Docker Desktop: https://www.docker.com/products/docker-desktop');
+        $this->info('  3. Install and start Docker Desktop');
+        $this->info('  4. Verify with: docker --version');
     }
 
     /**
@@ -439,12 +436,12 @@ trait InteractsWithDocker
      */
     protected function provideGenericInstallationGuidance(): void
     {
-        info('Docker Installation:');
-        info('');
-        info('Visit the official Docker documentation:');
-        info('  https://docs.docker.com/get-docker/');
-        info('');
-        info('After installation, verify with: docker --version');
+        $this->info('Docker Installation:');
+        $this->info('');
+        $this->info('Visit the official Docker documentation:');
+        $this->info('  https://docs.docker.com/get-docker/');
+        $this->info('');
+        $this->info('After installation, verify with: docker --version');
     }
 
     /**

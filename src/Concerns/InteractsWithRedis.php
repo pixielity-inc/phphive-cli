@@ -4,15 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Concerns;
 
-use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\password;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
-
 use PhpHive\Cli\Support\Filesystem;
 use RuntimeException;
 
@@ -144,12 +135,12 @@ trait InteractsWithRedis
 
         if ($this->isDockerAvailable()) {
             // Docker is available - offer Docker setup
-            note(
+            $this->note(
                 'Docker detected! Using Docker provides isolated Redis instances, easy management, and no local installation needed.',
                 'Redis Setup'
             );
 
-            $useDocker = confirm(
+            $useDocker = $this->confirm(
                 label: 'Would you like to use Docker for Redis? (recommended)',
                 default: true
             );
@@ -161,19 +152,19 @@ trait InteractsWithRedis
                 }
 
                 // Docker setup failed, fall back to local
-                warning('Docker setup failed. Falling back to local Redis setup.');
+                $this->warning('Docker setup failed. Falling back to local Redis setup.');
             }
 
         } elseif (! $this->isDockerInstalled()) {
             // Docker not installed - offer installation guidance
-            $installDocker = confirm(
+            $installDocker = $this->confirm(
                 label: 'Docker is not installed. Would you like to see installation instructions?',
                 default: false
             );
 
             if ($installDocker) {
                 $this->provideDockerInstallationGuidance();
-                info('After installing Docker, you can recreate this application to use Docker.');
+                $this->info('After installing Docker, you can recreate this application to use Docker.');
             }
         }
 
@@ -223,13 +214,13 @@ trait InteractsWithRedis
         // CONFIGURATION
         // =====================================================================
 
-        info('Configuring Redis...');
+        $this->info('Configuring Redis...');
 
         // Generate secure password (32 characters hex)
         $password = bin2hex(random_bytes(16));
 
         // Prompt for port configuration
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Redis port',
             placeholder: '6379',
             default: '6379',
@@ -242,7 +233,7 @@ trait InteractsWithRedis
         // GENERATE DOCKER COMPOSE FILE
         // =====================================================================
 
-        info('Generating docker-compose.yml...');
+        $this->info('Generating docker-compose.yml...');
 
         $composeGenerated = $this->generateRedisDockerComposeFile(
             $appPath,
@@ -252,7 +243,7 @@ trait InteractsWithRedis
         );
 
         if (! $composeGenerated) {
-            error('Failed to generate docker-compose.yml');
+            $this->error('Failed to generate docker-compose.yml');
 
             return null;
         }
@@ -261,15 +252,15 @@ trait InteractsWithRedis
         // START CONTAINER
         // =====================================================================
 
-        info('Starting Redis container...');
+        $this->info('Starting Redis container...');
 
-        $started = spin(
+        $started = $this->spin(
             callback: fn (): bool => $this->startDockerContainers($appPath),
             message: 'Starting Redis container...'
         );
 
         if (! $started) {
-            error('Failed to start Redis container');
+            $this->error('Failed to start Redis container');
 
             return null;
         }
@@ -278,26 +269,26 @@ trait InteractsWithRedis
         // WAIT FOR REDIS TO BE READY
         // =====================================================================
 
-        info('Waiting for Redis to be ready...');
+        $this->info('Waiting for Redis to be ready...');
 
-        $ready = spin(
+        $ready = $this->spin(
             callback: fn (): bool => $this->waitForDockerService($appPath, 'redis', 30),
             message: 'Waiting for Redis...'
         );
 
         if (! $ready) {
-            warning('Redis may not be fully ready. You may need to wait a moment before using it.');
+            $this->warning('Redis may not be fully ready. You may need to wait a moment before using it.');
         } else {
-            info('✓ Redis is ready!');
+            $this->info('✓ Redis is ready!');
         }
 
         // =====================================================================
         // RETURN CONFIGURATION
         // =====================================================================
 
-        info('✓ Docker Redis setup complete!');
-        info("Redis connection: localhost:{$port}");
-        info("Redis password: {$password}");
+        $this->info('✓ Docker Redis setup complete!');
+        $this->info("Redis connection: localhost:{$port}");
+        $this->info("Redis password: {$password}");
 
         return [
             'redis_host' => 'localhost',
@@ -402,26 +393,95 @@ trait InteractsWithRedis
      */
     protected function setupLocalRedis(string $appName): array
     {
-        note(
+        $this->note(
             'Setting up local Redis. Ensure Redis is installed and running.',
             'Local Redis Setup'
         );
 
         // Check if user wants automatic configuration
-        $autoConfig = confirm(
+        $autoConfig = $this->confirm(
             label: 'Is Redis already running locally?',
             default: false
         );
 
-        if (! $autoConfig) {
-            // Provide installation guidance
-            $this->provideRedisInstallationGuidance();
+        if ($autoConfig) {
+            // Verify Redis is actually running
+            $isRunning = $this->spin(
+                callback: fn (): bool => $this->checkRedisConnection('127.0.0.1', 6379),
+                message: 'Checking Redis connection...'
+            );
 
-            info('After installing and starting Redis, please configure the connection details.');
+            if ($isRunning) {
+                $this->info('✓ Redis is running and accessible!');
+
+                // Use default local configuration
+                return [
+                    'redis_host' => '127.0.0.1',
+                    'redis_port' => 6379,
+                    'redis_password' => '',
+                    'using_docker' => false,
+                ];
+            }
+
+            // Redis check failed
+            $this->error('✗ Could not connect to Redis on 127.0.0.1:6379');
+            $this->warning('Redis does not appear to be running.');
+
+            // Offer to try Docker if available
+            if ($this->isDockerAvailable()) {
+                $tryDocker = $this->confirm(
+                    label: 'Would you like to use Docker for Redis instead?',
+                    default: true
+                );
+
+                if ($tryDocker) {
+                    $cwd = getcwd();
+                    if ($cwd === false) {
+                        $this->error('Could not determine current working directory');
+                        exit(1);
+                    }
+                    $dockerConfig = $this->setupDockerRedis($appName, $cwd);
+                    if ($dockerConfig !== null) {
+                        return $dockerConfig;
+                    }
+                }
+            }
+
+            // Show installation guidance
+            $this->provideRedisInstallationGuidance();
+            $this->error('Please install and start Redis, then try again.');
+            exit(1);
         }
+
+        // User said Redis is not running - provide installation guidance
+        $this->provideRedisInstallationGuidance();
+        $this->info('After installing and starting Redis, please configure the connection details.');
 
         // Prompt for manual configuration
         return $this->promptRedisConfiguration($appName);
+    }
+
+    /**
+     * Check if Redis is accessible at the given host and port.
+     *
+     * Attempts to connect to Redis and execute a PING command to verify
+     * the connection is working. This is a quick health check to ensure
+     * Redis is running and accessible.
+     *
+     * @param  string $host Redis host
+     * @param  int    $port Redis port
+     * @return bool   True if Redis is accessible, false otherwise
+     */
+    protected function checkRedisConnection(string $host, int $port): bool
+    {
+        try {
+            // Try to connect using redis-cli ping
+            $result = $this->process()->run(['redis-cli', '-h', $host, '-p', (string) $port, 'ping']);
+
+            return trim($result) === 'PONG';
+        } catch (RuntimeException) {
+            return false;
+        }
     }
 
     /**
@@ -450,7 +510,7 @@ trait InteractsWithRedis
 
         $os = $this->detectOS();
 
-        note(
+        $this->note(
             'Redis is not running. Redis provides high-performance caching and session storage.',
             'Redis Not Available'
         );
@@ -468,16 +528,16 @@ trait InteractsWithRedis
      */
     protected function provideMacOSRedisGuidance(): void
     {
-        info('macOS Installation:');
-        info('');
-        info('Homebrew (Recommended):');
-        info('  brew install redis');
-        info('  brew services start redis');
-        info('');
-        info('After installation:');
-        info('  1. Redis will start automatically');
-        info('  2. Verify with: redis-cli ping');
-        info('  3. Documentation: https://redis.io/docs');
+        $this->info('macOS Installation:');
+        $this->info('');
+        $this->info('Homebrew (Recommended):');
+        $this->info('  brew install redis');
+        $this->info('  brew services start redis');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Redis will start automatically');
+        $this->info('  2. Verify with: redis-cli ping');
+        $this->info('  3. Documentation: https://redis.io/docs');
     }
 
     /**
@@ -485,20 +545,20 @@ trait InteractsWithRedis
      */
     protected function provideLinuxRedisGuidance(): void
     {
-        info('Linux Installation:');
-        info('');
-        info('Ubuntu/Debian:');
-        info('  sudo apt-get update');
-        info('  sudo apt-get install redis-server');
-        info('  sudo systemctl start redis-server');
-        info('');
-        info('RHEL/CentOS:');
-        info('  sudo yum install redis');
-        info('  sudo systemctl start redis');
-        info('');
-        info('After installation:');
-        info('  1. Verify with: redis-cli ping');
-        info('  2. Documentation: https://redis.io/docs');
+        $this->info('Linux Installation:');
+        $this->info('');
+        $this->info('Ubuntu/Debian:');
+        $this->info('  sudo apt-get update');
+        $this->info('  sudo apt-get install redis-server');
+        $this->info('  sudo systemctl start redis-server');
+        $this->info('');
+        $this->info('RHEL/CentOS:');
+        $this->info('  sudo yum install redis');
+        $this->info('  sudo systemctl start redis');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Verify with: redis-cli ping');
+        $this->info('  2. Documentation: https://redis.io/docs');
     }
 
     /**
@@ -506,19 +566,19 @@ trait InteractsWithRedis
      */
     protected function provideWindowsRedisGuidance(): void
     {
-        info('Windows Installation:');
-        info('');
-        info('Option 1: WSL (Recommended):');
-        info('  1. Install WSL2');
-        info('  2. Follow Linux installation steps');
-        info('');
-        info('Option 2: Native Windows Port:');
-        info('  1. Download from: https://github.com/microsoftarchive/redis/releases');
-        info('  2. Extract and run redis-server.exe');
-        info('');
-        info('After installation:');
-        info('  1. Verify with: redis-cli ping');
-        info('  2. Documentation: https://redis.io/docs');
+        $this->info('Windows Installation:');
+        $this->info('');
+        $this->info('Option 1: WSL (Recommended):');
+        $this->info('  1. Install WSL2');
+        $this->info('  2. Follow Linux installation steps');
+        $this->info('');
+        $this->info('Option 2: Native Windows Port:');
+        $this->info('  1. Download from: https://github.com/microsoftarchive/redis/releases');
+        $this->info('  2. Extract and run redis-server.exe');
+        $this->info('');
+        $this->info('After installation:');
+        $this->info('  1. Verify with: redis-cli ping');
+        $this->info('  2. Documentation: https://redis.io/docs');
     }
 
     /**
@@ -526,13 +586,13 @@ trait InteractsWithRedis
      */
     protected function provideGenericRedisGuidance(): void
     {
-        info('Redis Installation:');
-        info('');
-        info('Visit the official Redis documentation:');
-        info('  https://redis.io/docs/getting-started/installation/');
-        info('');
-        info('After installation, verify with:');
-        info('  redis-cli ping');
+        $this->info('Redis Installation:');
+        $this->info('');
+        $this->info('Visit the official Redis documentation:');
+        $this->info('  https://redis.io/docs/getting-started/installation/');
+        $this->info('');
+        $this->info('After installation, verify with:');
+        $this->info('  redis-cli ping');
     }
 
     /**
@@ -586,7 +646,7 @@ trait InteractsWithRedis
         }
 
         // Display informational note about manual configuration
-        note(
+        $this->note(
             'Please enter the connection details for your Redis instance.',
             'Manual Redis Configuration'
         );
@@ -596,7 +656,7 @@ trait InteractsWithRedis
         // =====================================================================
 
         // Prompt for Redis host
-        $host = text(
+        $host = $this->text(
             label: 'Redis host',
             placeholder: 'localhost',
             default: 'localhost',
@@ -605,7 +665,7 @@ trait InteractsWithRedis
         );
 
         // Prompt for Redis port
-        $portInput = text(
+        $portInput = $this->text(
             label: 'Redis port',
             placeholder: '6379',
             default: '6379',
@@ -618,7 +678,7 @@ trait InteractsWithRedis
         // PASSWORD CONFIGURATION
         // =====================================================================
 
-        $hasPassword = confirm(
+        $hasPassword = $this->confirm(
             label: 'Does Redis require a password?',
             default: false,
             hint: 'Redis can run with or without password authentication'
@@ -626,7 +686,7 @@ trait InteractsWithRedis
 
         $redisPassword = '';
         if ($hasPassword) {
-            $redisPassword = password(
+            $redisPassword = $this->password(
                 label: 'Redis password',
                 required: true,
                 hint: 'Enter the Redis password'
