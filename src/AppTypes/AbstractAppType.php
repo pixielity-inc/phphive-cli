@@ -6,6 +6,7 @@ namespace PhpHive\Cli\AppTypes;
 
 use PhpHive\Cli\Concerns\InteractsWithPrompts;
 use PhpHive\Cli\Contracts\AppTypeInterface;
+use PhpHive\Cli\Support\Composer;
 use PhpHive\Cli\Support\Filesystem;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -149,7 +150,7 @@ abstract class AbstractAppType implements AppTypeInterface
         // Description - only prompt if not provided via --description option
         $descriptionOption = $input->getOption('description');
         if ($descriptionOption !== null && $descriptionOption !== '') {
-            $config['description'] = $descriptionOption;
+            $config[AppTypeInterface::CONFIG_DESCRIPTION] = $descriptionOption;
         }
         // If description not provided, it will be set by CreateAppCommand with a default
 
@@ -304,22 +305,22 @@ abstract class AbstractAppType implements AppTypeInterface
     protected function getCommonStubVariables(array $config): array
     {
         // Extract app name from config, default to 'app' if not provided
-        $appName = $config['name'] ?? 'app';
+        $appName = $config[AppTypeInterface::CONFIG_NAME] ?? 'app';
 
         // Normalize the name for use in directories and package names
         $normalizedName = $this->normalizeAppName($appName);
 
         return [
             // Original name as entered by user
-            '{{APP_NAME}}' => $appName,
+            AppTypeInterface::STUB_APP_NAME => $appName,
             // Normalized name for directories and package names (lowercase, hyphenated)
-            '{{APP_NAME_NORMALIZED}}' => $normalizedName,
+            AppTypeInterface::STUB_APP_NAME_NORMALIZED => $normalizedName,
             // PascalCase namespace component for PHP classes
-            '{{APP_NAMESPACE}}' => $this->nameToNamespace($appName),
+            AppTypeInterface::STUB_APP_NAMESPACE => $this->nameToNamespace($appName),
             // Full Composer package name following phphive/* convention
-            '{{PACKAGE_NAME}}' => "phphive/{$normalizedName}",
+            AppTypeInterface::STUB_PACKAGE_NAME => "phphive/{$normalizedName}",
             // Application description from config or generated default
-            '{{DESCRIPTION}}' => $config['description'] ?? "Application: {$appName}",
+            AppTypeInterface::STUB_DESCRIPTION => $config[AppTypeInterface::CONFIG_DESCRIPTION] ?? "Application: {$appName}",
         ];
     }
 
@@ -338,10 +339,10 @@ abstract class AbstractAppType implements AppTypeInterface
      * $this->composerService()->require('/path/to/project', 'symfony/console');
      * ```
      *
-     * @return \PhpHive\Cli\Support\Composer The Composer service instance
+     * @return Composer The Composer service instance
      */
-    protected function composerService(): \PhpHive\Cli\Support\Composer
+    protected function composerService(): Composer
     {
-        return \PhpHive\Cli\Support\Composer::make();
+        return Composer::make();
     }
 }

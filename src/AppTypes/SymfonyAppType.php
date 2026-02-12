@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\AppTypes;
 
+use Override;
+use PhpHive\Cli\Contracts\AppTypeInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -104,6 +106,7 @@ class SymfonyAppType extends AbstractAppType
      * @param  OutputInterface      $output Console output interface for displaying messages
      * @return array<string, mixed> Configuration array with all collected settings
      */
+    #[Override]
     public function collectConfiguration(InputInterface $input, OutputInterface $output): array
     {
         // Store input/output for use in helper methods
@@ -118,14 +121,14 @@ class SymfonyAppType extends AbstractAppType
         // =====================================================================
 
         // Application name - used for directory name, package name, and namespace
-        $config['name'] = $this->text(
+        $config[AppTypeInterface::CONFIG_NAME] = $this->text(
             label: 'Application name',
             placeholder: 'my-app',
             required: true
         );
 
         // Application description - used in composer.json and documentation
-        $config['description'] = $this->text(
+        $config[AppTypeInterface::CONFIG_DESCRIPTION] = $this->text(
             label: 'Application description',
             placeholder: 'A Symfony application',
             required: false
@@ -139,7 +142,7 @@ class SymfonyAppType extends AbstractAppType
         // - Version 7.1: Long-term support (LTS) with extended maintenance
         // - Version 7.0: Latest stable version
         // - Version 6.4: Previous LTS version for legacy compatibility
-        $config['symfony_version'] = $this->select(
+        $config[AppTypeInterface::CONFIG_SYMFONY_VERSION] = $this->select(
             label: 'Symfony version',
             options: [
                 '7.1' => 'Symfony 7.1 (LTS)',
@@ -156,7 +159,7 @@ class SymfonyAppType extends AbstractAppType
         // Project type selection determines which packages to install
         // - webapp: Installs symfony/webapp-pack for full-featured application
         // - skeleton: Minimal with only HTTP kernel and routing
-        $config['project_type'] = $this->select(
+        $config[AppTypeInterface::CONFIG_PROJECT_TYPE] = $this->select(
             label: 'Project type',
             options: [
                 'webapp' => 'Web Application (Full-featured)',
@@ -171,7 +174,7 @@ class SymfonyAppType extends AbstractAppType
 
         // Database driver selection
         // Determines the default database connection in config/packages/doctrine.yaml
-        $config['database'] = $this->select(
+        $config[AppTypeInterface::CONFIG_DATABASE] = $this->select(
             label: 'Database driver',
             options: [
                 'mysql' => 'MySQL',
@@ -187,14 +190,14 @@ class SymfonyAppType extends AbstractAppType
 
         // Symfony Maker Bundle - Code generation tool
         // Provides console commands to generate controllers, entities, forms, etc.
-        $config['install_maker'] = $this->confirm(
+        $config[AppTypeInterface::CONFIG_INSTALL_MAKER] = $this->confirm(
             label: 'Install Symfony Maker Bundle (Code generation)?',
             default: true
         );
 
         // Symfony Security Bundle - Authentication and authorization
         // Provides user authentication, authorization, and security features
-        $config['install_security'] = $this->confirm(
+        $config[AppTypeInterface::CONFIG_INSTALL_SECURITY] = $this->confirm(
             label: 'Install Security Bundle (Authentication)?',
             default: true
         );
@@ -229,7 +232,7 @@ class SymfonyAppType extends AbstractAppType
     public function getInstallCommand(array $config): string
     {
         // Extract version from config
-        $version = $config['symfony_version'] ?? '7.1';
+        $version = $config[AppTypeInterface::CONFIG_SYMFONY_VERSION] ?? '7.1';
 
         // Always use symfony/skeleton (website-skeleton is abandoned)
         return "composer create-project symfony/skeleton:{$version}.* .";
@@ -266,7 +269,7 @@ class SymfonyAppType extends AbstractAppType
 
         // Install webapp pack for full-featured applications
         // This includes Twig, forms, security, asset management, etc.
-        if (($config['project_type'] ?? 'webapp') === 'webapp') {
+        if (($config[AppTypeInterface::CONFIG_PROJECT_TYPE] ?? 'webapp') === 'webapp') {
             $commands[] = 'composer require symfony/webapp-pack';
         }
 
@@ -276,13 +279,13 @@ class SymfonyAppType extends AbstractAppType
 
         // Install Symfony Maker Bundle if requested
         // Maker provides code generation commands (make:controller, make:entity, etc.)
-        if (($config['install_maker'] ?? true) === true) {
+        if (($config[AppTypeInterface::CONFIG_INSTALL_MAKER] ?? true) === true) {
             $commands[] = 'composer require --dev symfony/maker-bundle';
         }
 
         // Install Symfony Security Bundle if requested
         // Security provides authentication, authorization, and user management
-        if (($config['install_security'] ?? true) === true) {
+        if (($config[AppTypeInterface::CONFIG_INSTALL_SECURITY] ?? true) === true) {
             $commands[] = 'composer require symfony/security-bundle';
         }
 
@@ -367,10 +370,10 @@ class SymfonyAppType extends AbstractAppType
         return [
             ...$common,
             // Database driver for .env and config/packages/doctrine.yaml
-            '{{DATABASE_DRIVER}}' => $config['database'] ?? 'mysql',
+            AppTypeInterface::STUB_DATABASE_DRIVER => $config[AppTypeInterface::CONFIG_DATABASE] ?? 'mysql',
 
             // Symfony version for composer.json constraints
-            '{{SYMFONY_VERSION}}' => $config['symfony_version'] ?? '7.2',
+            AppTypeInterface::STUB_SYMFONY_VERSION => $config[AppTypeInterface::CONFIG_SYMFONY_VERSION] ?? '7.2',
         ];
     }
 }

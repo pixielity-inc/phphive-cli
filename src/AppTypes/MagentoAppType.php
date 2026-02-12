@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\AppTypes;
 
+use Override;
 use PhpHive\Cli\Concerns\InteractsWithDatabase;
 use PhpHive\Cli\Concerns\InteractsWithDocker;
 use PhpHive\Cli\Concerns\InteractsWithElasticsearch;
@@ -11,6 +12,7 @@ use PhpHive\Cli\Concerns\InteractsWithMagentoMarketplace;
 use PhpHive\Cli\Concerns\InteractsWithMeilisearch;
 use PhpHive\Cli\Concerns\InteractsWithMinio;
 use PhpHive\Cli\Concerns\InteractsWithRedis;
+use PhpHive\Cli\Contracts\AppTypeInterface;
 use PhpHive\Cli\Support\Process;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputInterface;
@@ -180,6 +182,7 @@ class MagentoAppType extends AbstractAppType
      * @param  OutputInterface      $output Console output interface for displaying messages
      * @return array<string, mixed> Configuration array with all collected settings
      */
+    #[Override]
     public function collectConfiguration(InputInterface $input, OutputInterface $output): array
     {
         // Store input/output for use in helper methods
@@ -194,10 +197,10 @@ class MagentoAppType extends AbstractAppType
         // =====================================================================
 
         // Application name - from argument
-        $config['name'] = $input->getArgument('name');
+        $config[AppTypeInterface::CONFIG_NAME] = $input->getArgument('name');
 
         // Application description - from option or prompt
-        $config['description'] = $input->getOption('description') ?? $this->text(
+        $config[AppTypeInterface::CONFIG_DESCRIPTION] = $input->getOption('description') ?? $this->text(
             label: 'Application description',
             placeholder: 'A Magento e-commerce store',
             required: false
@@ -227,7 +230,7 @@ class MagentoAppType extends AbstractAppType
         );
 
         // Magento version selection
-        $config['magento_version'] = $input->getOption('magento-version') ?? $this->select(
+        $config[AppTypeInterface::CONFIG_MAGENTO_VERSION] = $input->getOption('magento-version') ?? $this->select(
             label: 'Magento version',
             options: [
                 '2.4.7' => 'Magento 2.4.7 (Latest)',
@@ -261,21 +264,21 @@ class MagentoAppType extends AbstractAppType
             $noDocker = $input->getOption('no-docker');
 
             // Use Docker-first database setup (supports Docker and local MySQL)
-            $appPath = getcwd() . '/apps/' . $config['name'];
+            $appPath = getcwd() . '/apps/' . $config[AppTypeInterface::CONFIG_NAME];
 
             // If --no-docker flag is set, skip Docker and go straight to local
             if ($noDocker === true) {
-                $dbConfig = $this->setupLocalDatabase($config['name']);
+                $dbConfig = $this->setupLocalDatabase($config[AppTypeInterface::CONFIG_NAME]);
             } elseif ($useDocker === true) {
                 // Force Docker setup
-                $dbConfig = $this->setupDockerDatabase($config['name'], ['mysql', 'mariadb'], $appPath);
+                $dbConfig = $this->setupDockerDatabase($config[AppTypeInterface::CONFIG_NAME], ['mysql', 'mariadb'], $appPath);
                 if ($dbConfig === null) {
                     // Docker setup failed, fall back to local
-                    $dbConfig = $this->setupLocalDatabase($config['name']);
+                    $dbConfig = $this->setupLocalDatabase($config[AppTypeInterface::CONFIG_NAME]);
                 }
             } else {
                 // Normal flow - Docker-first with prompts
-                $dbConfig = $this->setupDatabase($config['name'], ['mysql', 'mariadb'], $appPath);
+                $dbConfig = $this->setupDatabase($config[AppTypeInterface::CONFIG_NAME], ['mysql', 'mariadb'], $appPath);
             }
 
             // Merge database configuration into main config
@@ -403,10 +406,10 @@ class MagentoAppType extends AbstractAppType
 
         // Setup Redis if enabled
         if ($config['use_redis']) {
-            $appPath = getcwd() . '/apps/' . $config['name'];
+            $appPath = getcwd() . '/apps/' . $config[AppTypeInterface::CONFIG_NAME];
 
             // Use InteractsWithRedis trait for comprehensive setup
-            $redisConfig = $this->setupRedis($config['name'], $appPath);
+            $redisConfig = $this->setupRedis($config[AppTypeInterface::CONFIG_NAME], $appPath);
 
             // Merge Redis configuration
             $config['redis_host'] = $redisConfig['redis_host'];
@@ -456,10 +459,10 @@ class MagentoAppType extends AbstractAppType
 
         // Setup Elasticsearch if enabled
         if ($config['use_elasticsearch']) {
-            $appPath = getcwd() . '/apps/' . $config['name'];
+            $appPath = getcwd() . '/apps/' . $config[AppTypeInterface::CONFIG_NAME];
 
             // Use InteractsWithElasticsearch trait for comprehensive setup
-            $esConfig = $this->setupElasticsearch($config['name'], $appPath);
+            $esConfig = $this->setupElasticsearch($config[AppTypeInterface::CONFIG_NAME], $appPath);
 
             // Merge Elasticsearch configuration
             $config['elasticsearch_host'] = $esConfig['elasticsearch_host'];
@@ -471,10 +474,10 @@ class MagentoAppType extends AbstractAppType
 
         // Setup Meilisearch if enabled
         if ($config['use_meilisearch']) {
-            $appPath = getcwd() . '/apps/' . $config['name'];
+            $appPath = getcwd() . '/apps/' . $config[AppTypeInterface::CONFIG_NAME];
 
             // Use InteractsWithMeilisearch trait for comprehensive setup
-            $meilisearchConfig = $this->setupMeilisearch($config['name'], $appPath);
+            $meilisearchConfig = $this->setupMeilisearch($config[AppTypeInterface::CONFIG_NAME], $appPath);
 
             // Merge Meilisearch configuration
             $config['meilisearch_host'] = $meilisearchConfig['meilisearch_host'];
@@ -496,10 +499,10 @@ class MagentoAppType extends AbstractAppType
 
         // Setup Minio if enabled
         if ($config['use_minio']) {
-            $appPath = getcwd() . '/apps/' . $config['name'];
+            $appPath = getcwd() . '/apps/' . $config[AppTypeInterface::CONFIG_NAME];
 
             // Use InteractsWithMinio trait for comprehensive setup
-            $minioConfig = $this->setupMinio($config['name'], $appPath);
+            $minioConfig = $this->setupMinio($config[AppTypeInterface::CONFIG_NAME], $appPath);
 
             // Merge Minio configuration
             $config['minio_endpoint'] = $minioConfig['minio_endpoint'];
@@ -531,7 +534,7 @@ class MagentoAppType extends AbstractAppType
     public function getInstallCommand(array $config): string
     {
         // Extract Magento version from config, default to version 2.4.7
-        $version = $config['magento_version'] ?? '2.4.7';
+        $version = $config[AppTypeInterface::CONFIG_MAGENTO_VERSION] ?? '2.4.7';
 
         // Extract Magento edition from config, default to community
         $edition = $config['magento_edition'] ?? 'community';
@@ -859,13 +862,13 @@ class MagentoAppType extends AbstractAppType
         return [
             ...$common,
             // Magento version for composer.json constraints
-            '{{MAGENTO_VERSION}}' => $config['magento_version'] ?? '2.4.7',
+            AppTypeInterface::STUB_MAGENTO_VERSION => $config[AppTypeInterface::CONFIG_MAGENTO_VERSION] ?? '2.4.7',
 
             // Store base URL for configuration
-            '{{BASE_URL}}' => $config['base_url'] ?? 'http://localhost/',
+            AppTypeInterface::STUB_BASE_URL => $config['base_url'] ?? 'http://localhost/',
 
             // Admin username for documentation
-            '{{ADMIN_USER}}' => $config['admin_user'] ?? 'admin',
+            AppTypeInterface::STUB_ADMIN_USER => $config['admin_user'] ?? 'admin',
         ];
     }
 
