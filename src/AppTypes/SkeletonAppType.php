@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\AppTypes;
 
+use Override;
+use PhpHive\Cli\Contracts\AppTypeInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -24,7 +26,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * - Learning projects and prototypes
  *
  * Features supported:
- * - Configurable minimum PHP version (8.2, 8.4, 8.5)
+ * - PHP ^8.4 requirement (allows 8.4, 8.5, etc.)
  * - Optional PHPUnit for testing
  * - Optional quality tools (PHPStan, Pint)
  * - PSR-4 autoloading configuration
@@ -46,7 +48,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  * [
  *     'name' => 'my-service',
  *     'description' => 'A microservice',
- *     'php_version' => '8.3',
  *     'include_tests' => true,
  *     'include_quality_tools' => true,
  * ]
@@ -90,7 +91,7 @@ class SkeletonAppType extends AbstractAppType
      *
      * Configuration collected:
      * - Application name and description
-     * - Minimum PHP version (8.2, 8.4, 8.5)
+     * - Minimum PHP version (8.2, 8.3, 8.4, 8.5)
      * - Whether to include PHPUnit for testing
      * - Whether to include quality tools (PHPStan, Pint)
      *
@@ -103,6 +104,7 @@ class SkeletonAppType extends AbstractAppType
      * @param  OutputInterface      $output Console output interface for displaying messages
      * @return array<string, mixed> Configuration array with all collected settings
      */
+    #[Override]
     public function collectConfiguration(InputInterface $input, OutputInterface $output): array
     {
         // Get common configuration (description if provided via option)
@@ -115,7 +117,7 @@ class SkeletonAppType extends AbstractAppType
         // Minimum PHP version requirement
         // This determines the "require.php" constraint in composer.json
         // and affects which language features can be used
-        $config['php_version'] = $this->select(
+        $config[AppTypeInterface::CONFIG_PHP_VERSION] = $this->select(
             label: 'Minimum PHP version',
             options: [
                 '8.5' => 'PHP 8.5',
@@ -132,14 +134,14 @@ class SkeletonAppType extends AbstractAppType
 
         // PHPUnit - Unit testing framework
         // Includes PHPUnit in require-dev and creates tests/ directory
-        $config['include_tests'] = $this->confirm(
+        $config[AppTypeInterface::CONFIG_INCLUDE_TESTS] = $this->confirm(
             label: 'Include PHPUnit for testing?',
             default: true
         );
 
         // Quality tools - Static analysis and code formatting
         // Includes PHPStan (static analysis) and Pint (code formatting)
-        $config['include_quality_tools'] = $this->confirm(
+        $config[AppTypeInterface::CONFIG_INCLUDE_QUALITY_TOOLS] = $this->confirm(
             label: 'Include quality tools (PHPStan, Pint)?',
             default: true
         );
@@ -200,7 +202,7 @@ class SkeletonAppType extends AbstractAppType
         // Run PHPUnit tests if testing is enabled
         // This verifies that the application structure is correct and
         // that all dependencies are properly installed
-        if (($config['include_tests'] ?? true) === true) {
+        if (($config[AppTypeInterface::CONFIG_INCLUDE_TESTS] ?? true) === true) {
             $commands[] = 'composer test';
         }
 
@@ -246,7 +248,7 @@ class SkeletonAppType extends AbstractAppType
      * - {{DESCRIPTION}}: Application description
      *
      * Skeleton-specific variables:
-     * - {{PHP_VERSION}}: Selected minimum PHP version (8.2, 8.4, 8.5)
+     * - {{PHP_VERSION}}: Selected minimum PHP version (8.2, 8.3, 8.4, 8.5)
      *
      * Example stub usage:
      * ```json
@@ -276,7 +278,7 @@ class SkeletonAppType extends AbstractAppType
         return [
             ...$common,
             // PHP version for composer.json "require.php" constraint
-            '{{PHP_VERSION}}' => $config['php_version'] ?? '8.3',
+            AppTypeInterface::STUB_PHP_VERSION => $config[AppTypeInterface::CONFIG_PHP_VERSION] ?? '8.3',
         ];
     }
 }
