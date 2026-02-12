@@ -1,7 +1,31 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^Trait PhpHive\\Cli\\Concerns\\InteractsWithDocker is used zero times and is not analysed\.$#'
-			identifier: trait.unused
+			message: '#^Call to function method_exists\(\) with \$this\(PhpHive\\Cli\\AppTypes\\MagentoAppType\) and ''isDockerAvailable'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Concerns/InteractsWithDocker.php
+			path: src/AppTypes/MagentoAppType.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(PhpHive\\Cli\\AppTypes\\MagentoAppType\) and ''isDockerInstalled'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/AppTypes/MagentoAppType.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(PhpHive\\Cli\\AppTypes\\MagentoAppType\) and ''provideDockerInstal…'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/AppTypes/MagentoAppType.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(PhpHive\\Cli\\AppTypes\\MagentoAppType\) and ''startDockerContaine…'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/AppTypes/MagentoAppType.php
+
+		-
+			message: '#^Call to function method_exists\(\) with \$this\(PhpHive\\Cli\\AppTypes\\MagentoAppType\) and ''waitForDockerService'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/AppTypes/MagentoAppType.php

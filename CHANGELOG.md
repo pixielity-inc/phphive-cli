@@ -5,6 +5,42 @@ All notable changes to PhpHive CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.16] - 2026-02-12
+
+### Added
+
+- **Docker Integration for Database Setup**: New `InteractsWithDocker` trait for comprehensive Docker management
+  - Automatic Docker detection and installation guidance
+  - Docker Compose template generation for multiple database types
+  - Container lifecycle management (start, stop, health checks)
+  - Support for MySQL 8.0, PostgreSQL 15, and MariaDB 10.11
+  - Optional admin tools (phpMyAdmin for MySQL/MariaDB, Adminer for PostgreSQL)
+  - Named volumes for data persistence
+  - Standard ports (3306 for MySQL/MariaDB, 5432 for PostgreSQL)
+  - Graceful fallback to local MySQL when Docker unavailable
+
+- **Docker-First Database Setup**: Enhanced `InteractsWithDatabase` trait with Docker integration
+  - Orchestrates Docker-first approach with automatic fallback
+  - Detects Docker availability and recommends Docker when available
+  - Generates secure passwords for database users
+  - Waits for database containers to be ready before proceeding
+  - Provides detailed feedback using Laravel Prompts
+  - Seamless integration with existing local MySQL setup
+
+### Changed
+
+- **Magento App Creation**: Now uses Docker-first database setup
+  - Automatically offers Docker database setup when Docker is available
+  - Falls back to local MySQL setup if Docker unavailable or declined
+  - Supports both MySQL and MariaDB via Docker
+  - Simplified database configuration workflow
+
+### Fixed
+
+- **PHPStan Type Safety**: Fixed type mismatch in `setupDockerDatabase` method
+  - Cast `select()` return value to string for `generateDockerComposeFile()`
+  - Added baseline entries for `method_exists()` checks in trait composition
+
 ## [1.0.15] - 2026-02-12
 
 ### Added
