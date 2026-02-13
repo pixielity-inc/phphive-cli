@@ -378,155 +378,186 @@ final class CreateAppCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
-        // Display intro banner (skip in quiet/json mode)
-        // Step 1: Run preflight checks
-        if (! $isQuiet && ! $isJson) {
-            $this->intro('Application Creation');
-            $this->info('Running environment checks...');
-        }
-        $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
+        // Track app path for cleanup on failure
+        $appPath = null;
+        $appCreated = false;
 
-        if ($preflightResult->failed()) {
-            $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
+        try {
+            // Display intro banner (skip in quiet/json mode)
+            // Step 1: Run preflight checks
+            if (! $isQuiet && ! $isJson) {
+                $this->intro('Application Creation');
+                $this->info('Running environment checks...');
+            }
+            $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
+
+            if ($preflightResult->failed()) {
+                $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
+
+                return Command::FAILURE;
+            }
+
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+            }
+
+            // Step 2: Get and validate application name with smart suggestions
+            $name = $this->getValidatedAppName($input, $isQuiet, $isJson);
+
+            // Step 3: APP TYPE SELECTION
+            $typeOption = $input->getOption('type');
+            if ($typeOption !== null && $typeOption !== '') {
+                $appTypeId = $typeOption;
+
+                // Validate the provided app type
+                if (! $this->appTypeFactory()->isValid($appTypeId)) {
+                    $errorMsg = "Invalid app type: {$appTypeId}";
+                    if ($isJson) {
+                        $this->outputJson([
+                            'success' => false,
+                            'error' => $errorMsg,
+                            'available_types' => $this->appTypeFactory()->getIdentifiers(),
+                        ]);
+                    } else {
+                        $this->error($errorMsg);
+                        $this->line('Available types: ' . implode(', ', $this->appTypeFactory()->getIdentifiers()));
+                    }
+
+                    return Command::FAILURE;
+                }
+            } else {
+                // Prompt user to select app type
+                $appTypeId = $this->select(
+                    label: 'Select application type',
+                    options: AppTypeFactory::choices()
+                );
+            }
+
+            // Create the app type instance
+            $appType = $this->appTypeFactory()->create($appTypeId);
+            // Step 4: CONFIGURATION COLLECTION
+            if (! $isQuiet && ! $isJson) {
+                $this->comment("Selected: {$appType->getName()}");
+                $this->line('');
+                $this->comment('Configuration:');
+            }
+
+            // Set name in input so app types don't prompt for it
+            // (they should read from input argument if available)
+            $input->setArgument('name', $name);
+
+            // Set description in input if provided via option
+            $descriptionOption = $input->getOption('description');
+            if ($descriptionOption !== null && $descriptionOption !== '') {
+                $input->setOption('description', $descriptionOption);
+            }
+
+            $config = $appType->collectConfiguration($input, $output);
+
+            // Ensure name is set from command argument (override any prompts)
+            $config[AppTypeInterface::CONFIG_NAME] = $name;
+
+            // Set description from option if provided, otherwise use collected value or default
+            if ($descriptionOption !== null && $descriptionOption !== '') {
+                $config[AppTypeInterface::CONFIG_DESCRIPTION] = $descriptionOption;
+            } elseif (! isset($config[AppTypeInterface::CONFIG_DESCRIPTION]) || $config[AppTypeInterface::CONFIG_DESCRIPTION] === '') {
+                $config[AppTypeInterface::CONFIG_DESCRIPTION] = "A {$appType->getName()} application";
+            }
+
+            // Step 5: Execute application creation with progress feedback
+            $root = $this->getMonorepoRoot();
+            $appPath = "{$root}/apps/{$name}";
+            $appsDir = "{$root}/apps";
+            $filesystem = $this->filesystem();
+
+            // Mark that app directory will be created
+            $appCreated = true;
+
+            $steps = [
+                'Installing application framework' => fn (): bool => $this->runInstallCommand($appType, $config, $appsDir, $isVerbose),
+                'Setting up infrastructure' => fn (): bool => $this->setupInfrastructure($appType, $appPath, $name, $isVerbose),
+                'Processing configuration files' => fn () => $this->processStubs($appType, $config, $appPath, $filesystem),
+                'Running additional setup tasks' => fn (): bool => $this->runPostInstallCommands($appType, $config, $appPath, $isVerbose),
+            ];
+
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+            }
+
+            $startTime = microtime(true);
+            foreach ($steps as $message => $step) {
+                $stepStartTime = microtime(true);
+
+                if ($isQuiet || $isJson) {
+                    // No spinner in quiet/json mode
+                    $result = $step();
+                } else {
+                    $result = $this->spin($step, "{$message}...");
+                }
+
+                if ($result === false) {
+                    if ($isJson) {
+                        $this->outputJson([
+                            'success' => false,
+                            'error' => "Failed: {$message}",
+                            'app_name' => $name,
+                            'app_type' => $appType->getName(),
+                        ]);
+                    }
+
+                    return Command::FAILURE;
+                }
+
+                $stepDuration = microtime(true) - $stepStartTime;
+
+                if (! $isQuiet && ! $isJson) {
+                    $this->comment("✓ {$message} complete");
+                } elseif ($isVerbose && ! $isJson) {
+                    $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
+                }
+            }
+            $totalDuration = microtime(true) - $startTime;
+
+            // Step 6: Display success summary
+            $this->displaySuccessMessage(
+                'application',
+                $name,
+                $appPath,
+                $totalDuration,
+                [
+                    "cd apps/{$name}",
+                    'Review the generated files',
+                    "hive dev --workspace={$name}",
+                ],
+                $isQuiet,
+                $isJson,
+                $isVerbose
+            );
+
+            return Command::SUCCESS;
+        } catch (Exception $exception) {
+            // Cleanup on failure or cancellation
+            if ($appCreated && $appPath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->line('');
+                    $this->warning('Cleaning up failed application...');
+                }
+
+                $this->cleanupFailedWorkspace($appPath, $isQuiet, $isJson);
+            }
+
+            // Display error message
+            if ($isJson) {
+                $this->outputJson([
+                    'success' => false,
+                    'error' => $exception->getMessage(),
+                ]);
+            } else {
+                $this->error('Application creation failed: ' . $exception->getMessage());
+            }
 
             return Command::FAILURE;
         }
-
-        if (! $isQuiet && ! $isJson) {
-            $this->line('');
-        }
-
-        // Step 2: Get and validate application name with smart suggestions
-        $name = $this->getValidatedAppName($input, $isQuiet, $isJson);
-
-        // Step 3: APP TYPE SELECTION
-        $typeOption = $input->getOption('type');
-        if ($typeOption !== null && $typeOption !== '') {
-            $appTypeId = $typeOption;
-
-            // Validate the provided app type
-            if (! $this->appTypeFactory()->isValid($appTypeId)) {
-                $errorMsg = "Invalid app type: {$appTypeId}";
-                if ($isJson) {
-                    $this->outputJson([
-                        'success' => false,
-                        'error' => $errorMsg,
-                        'available_types' => $this->appTypeFactory()->getIdentifiers(),
-                    ]);
-                } else {
-                    $this->error($errorMsg);
-                    $this->line('Available types: ' . implode(', ', $this->appTypeFactory()->getIdentifiers()));
-                }
-
-                return Command::FAILURE;
-            }
-        } else {
-            // Prompt user to select app type
-            $appTypeId = $this->select(
-                label: 'Select application type',
-                options: AppTypeFactory::choices()
-            );
-        }
-
-        // Create the app type instance
-        $appType = $this->appTypeFactory()->create($appTypeId);
-        // Step 4: CONFIGURATION COLLECTION
-        if (! $isQuiet && ! $isJson) {
-            $this->comment("Selected: {$appType->getName()}");
-            $this->line('');
-            $this->comment('Configuration:');
-        }
-
-        // Set name in input so app types don't prompt for it
-        // (they should read from input argument if available)
-        $input->setArgument('name', $name);
-
-        // Set description in input if provided via option
-        $descriptionOption = $input->getOption('description');
-        if ($descriptionOption !== null && $descriptionOption !== '') {
-            $input->setOption('description', $descriptionOption);
-        }
-
-        $config = $appType->collectConfiguration($input, $output);
-
-        // Ensure name is set from command argument (override any prompts)
-        $config[AppTypeInterface::CONFIG_NAME] = $name;
-
-        // Set description from option if provided, otherwise use collected value or default
-        if ($descriptionOption !== null && $descriptionOption !== '') {
-            $config[AppTypeInterface::CONFIG_DESCRIPTION] = $descriptionOption;
-        } elseif (! isset($config[AppTypeInterface::CONFIG_DESCRIPTION]) || $config[AppTypeInterface::CONFIG_DESCRIPTION] === '') {
-            $config[AppTypeInterface::CONFIG_DESCRIPTION] = "A {$appType->getName()} application";
-        }
-
-        // Step 5: Execute application creation with progress feedback
-        $root = $this->getMonorepoRoot();
-        $appPath = "{$root}/apps/{$name}";
-        $appsDir = "{$root}/apps";
-        $filesystem = $this->filesystem();
-
-        $steps = [
-            'Installing application framework' => fn (): bool => $this->runInstallCommand($appType, $config, $appsDir, $isVerbose),
-            'Setting up infrastructure' => fn (): bool => $this->setupInfrastructure($appType, $appPath, $name, $isVerbose),
-            'Processing configuration files' => fn () => $this->processStubs($appType, $config, $appPath, $filesystem),
-            'Running additional setup tasks' => fn (): bool => $this->runPostInstallCommands($appType, $config, $appPath, $isVerbose),
-        ];
-
-        if (! $isQuiet && ! $isJson) {
-            $this->line('');
-        }
-
-        $startTime = microtime(true);
-        foreach ($steps as $message => $step) {
-            $stepStartTime = microtime(true);
-
-            if ($isQuiet || $isJson) {
-                // No spinner in quiet/json mode
-                $result = $step();
-            } else {
-                $result = $this->spin($step, "{$message}...");
-            }
-
-            if ($result === false) {
-                if ($isJson) {
-                    $this->outputJson([
-                        'success' => false,
-                        'error' => "Failed: {$message}",
-                        'app_name' => $name,
-                        'app_type' => $appType->getName(),
-                    ]);
-                }
-
-                return Command::FAILURE;
-            }
-
-            $stepDuration = microtime(true) - $stepStartTime;
-
-            if (! $isQuiet && ! $isJson) {
-                $this->comment("✓ {$message} complete");
-            } elseif ($isVerbose && ! $isJson) {
-                $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
-            }
-        }
-        $totalDuration = microtime(true) - $startTime;
-
-        // Step 6: Display success summary
-        $this->displaySuccessMessage(
-            'application',
-            $name,
-            $appPath,
-            $totalDuration,
-            [
-                "cd apps/{$name}",
-                'Review the generated files',
-                "hive dev --workspace={$name}",
-            ],
-            $isQuiet,
-            $isJson,
-            $isVerbose
-        );
-
-        return Command::SUCCESS;
     }
 
     /**

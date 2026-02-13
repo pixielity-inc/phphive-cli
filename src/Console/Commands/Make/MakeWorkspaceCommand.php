@@ -179,92 +179,124 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
-        // Display intro banner (skip in quiet/json mode)
-        // Step 1: Run preflight checks
-        if (! $isQuiet && ! $isJson) {
-            $this->intro('Create New Workspace');
-            $this->info('Running environment checks...');
-        }
-        $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
+        // Track workspace path for cleanup on failure
+        $workspacePath = null;
+        $workspaceCreated = false;
 
-        if ($preflightResult->failed()) {
-            $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
-
-            return Command::FAILURE;
-        }
-
-        if (! $isQuiet && ! $isJson) {
-            $this->line('');
-        }
-
-        // Step 2: Get and validate workspace name
-        $name = $this->getValidatedWorkspaceName($input, $isQuiet, $isJson);
-
-        // Step 3: Execute workspace creation with progress feedback
-        $steps = [
-            'Cloning workspace template' => fn (): int => $this->cloneTemplate($name, $isVerbose),
-            'Configuring workspace' => fn (): bool => $this->updateWorkspaceConfig($name),
-        ];
-
-        if (! $isQuiet && ! $isJson) {
-            $this->line('');
-            $this->info("Creating workspace: {$name}");
-            $this->line('');
-        }
-
-        $startTime = microtime(true);
-        foreach ($steps as $message => $step) {
-            $stepStartTime = microtime(true);
-
-            if ($isQuiet || $isJson) {
-                // No spinner in quiet/json mode
-                $result = $step();
-            } else {
-                $result = $this->spin($step, "{$message}...");
+        try {
+            // Display intro banner (skip in quiet/json mode)
+            // Step 1: Run preflight checks
+            if (! $isQuiet && ! $isJson) {
+                $this->intro('Create New Workspace');
+                $this->info('Running environment checks...');
             }
+            $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
 
-            if ($result !== 0 && $result !== true) {
-                if ($isJson) {
-                    $this->outputJson([
-                        'success' => false,
-                        'error' => "Failed: {$message}",
-                        'workspace_name' => $name,
-                    ]);
-                } else {
-                    $this->error("Failed: {$message}");
-                }
+            if ($preflightResult->failed()) {
+                $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
 
                 return Command::FAILURE;
             }
 
-            $stepDuration = microtime(true) - $stepStartTime;
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+            }
+
+            // Step 2: Get and validate workspace name
+            $name = $this->getValidatedWorkspaceName($input, $isQuiet, $isJson);
+
+            // Track workspace path for cleanup
+            $workspacePath = getcwd() . "/{$name}";
+            $workspaceCreated = true;
+
+            // Step 3: Execute workspace creation with progress feedback
+            $steps = [
+                'Cloning workspace template' => fn (): int => $this->cloneTemplate($name, $isVerbose),
+                'Configuring workspace' => fn (): bool => $this->updateWorkspaceConfig($name),
+            ];
 
             if (! $isQuiet && ! $isJson) {
-                $this->comment("✓ {$message} complete");
-            } elseif ($isVerbose && ! $isJson) {
-                $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
+                $this->line('');
+                $this->info("Creating workspace: {$name}");
+                $this->line('');
             }
+
+            $startTime = microtime(true);
+            foreach ($steps as $message => $step) {
+                $stepStartTime = microtime(true);
+
+                if ($isQuiet || $isJson) {
+                    // No spinner in quiet/json mode
+                    $result = $step();
+                } else {
+                    $result = $this->spin($step, "{$message}...");
+                }
+
+                if ($result !== 0 && $result !== true) {
+                    if ($isJson) {
+                        $this->outputJson([
+                            'success' => false,
+                            'error' => "Failed: {$message}",
+                            'workspace_name' => $name,
+                        ]);
+                    } else {
+                        $this->error("Failed: {$message}");
+                    }
+
+                    return Command::FAILURE;
+                }
+
+                $stepDuration = microtime(true) - $stepStartTime;
+
+                if (! $isQuiet && ! $isJson) {
+                    $this->comment("✓ {$message} complete");
+                } elseif ($isVerbose && ! $isJson) {
+                    $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
+                }
+            }
+            $totalDuration = microtime(true) - $startTime;
+
+            // Step 4: Display success summary
+            $this->displaySuccessMessage(
+                'workspace',
+                $name,
+                getcwd() . "/{$name}",
+                $totalDuration,
+                [
+                    "cd {$name}",
+                    'pnpm install',
+                    'composer install',
+                    'Start building!',
+                ],
+                $isQuiet,
+                $isJson,
+                $isVerbose
+            );
+
+            return Command::SUCCESS;
+        } catch (Exception $exception) {
+            // Cleanup on failure or cancellation
+            if ($workspaceCreated && $workspacePath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->line('');
+                    $this->warning('Cleaning up failed workspace...');
+                }
+
+                $this->cleanupFailedWorkspace($workspacePath, $isQuiet, $isJson);
+            }
+
+            // Display error message
+            if ($isJson) {
+                $this->outputJson([
+                    'success' => false,
+                    'error' => $exception->getMessage(),
+                ]);
+            } else {
+                $this->error('Workspace creation failed: ' . $exception->getMessage());
+            }
+
+            return Command::FAILURE;
         }
-        $totalDuration = microtime(true) - $startTime;
-
-        // Step 4: Display success summary
-        $this->displaySuccessMessage(
-            'workspace',
-            $name,
-            getcwd() . "/{$name}",
-            $totalDuration,
-            [
-                "cd {$name}",
-                'pnpm install',
-                'composer install',
-                'Start building!',
-            ],
-            $isQuiet,
-            $isJson,
-            $isVerbose
-        );
-
-        return Command::SUCCESS;
     }
 
     /**

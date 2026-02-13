@@ -268,4 +268,86 @@ abstract class BaseMakeCommand extends BaseCommand
             }
         }
     }
+
+    /**
+     * Clean up resources after failed or cancelled workspace creation.
+     *
+     * Removes the partially created workspace directory (app/package/workspace)
+     * and stops/removes any Docker containers that were started during setup.
+     *
+     * This method provides a centralized cleanup mechanism for all make commands,
+     * ensuring consistent behavior when operations fail or are cancelled.
+     *
+     * Cleanup actions:
+     * 1. Stop and remove Docker containers (if docker-compose.yml exists)
+     * 2. Remove Docker volumes
+     * 3. Delete the workspace directory
+     *
+     * The method handles errors gracefully and provides user feedback about
+     * cleanup progress and any issues encountered.
+     *
+     * Example usage:
+     * ```php
+     * try {
+     *     // ... workspace creation logic
+     * } catch (Exception $e) {
+     *     if ($workspaceCreated && $workspacePath !== null) {
+     *         $this->cleanupFailedWorkspace($workspacePath, $isQuiet, $isJson);
+     *     }
+     *     return Command::FAILURE;
+     * }
+     * ```
+     *
+     * @param string $workspacePath Absolute path to the workspace directory
+     * @param bool   $isQuiet       Whether to suppress output
+     * @param bool   $isJson        Whether output is in JSON format
+     */
+    protected function cleanupFailedWorkspace(string $workspacePath, bool $isQuiet, bool $isJson): void
+    {
+        if (! $isQuiet && ! $isJson) {
+            $this->line('');
+            $this->warning('Cleaning up...');
+        }
+
+        $filesystem = $this->filesystem();
+
+        // Check if workspace directory exists
+        if (! $filesystem->isDirectory($workspacePath)) {
+            return;
+        }
+
+        // Stop and remove Docker containers if docker-compose.yml exists
+        $dockerComposePath = "{$workspacePath}/docker-compose.yml";
+        if ($filesystem->exists($dockerComposePath)) {
+            try {
+                if (! $isQuiet && ! $isJson) {
+                    $this->comment('  Stopping Docker containers...');
+                }
+
+                // Stop and remove containers, networks, and volumes
+                $process = $this->process();
+                $process->run(['docker', 'compose', 'down', '-v'], $workspacePath);
+            } catch (Exception) {
+                // Ignore Docker cleanup errors - containers may not be running
+            }
+        }
+
+        // Remove the workspace directory
+        try {
+            if (! $isQuiet && ! $isJson) {
+                $this->comment('  Removing workspace directory...');
+            }
+
+            $filesystem->deleteDirectory($workspacePath);
+
+            if (! $isQuiet && ! $isJson) {
+                $this->info('✓ Cleanup complete');
+            }
+        } catch (Exception $e) {
+            if (! $isQuiet && ! $isJson) {
+                $this->error("Failed to remove directory: {$e->getMessage()}");
+                $this->comment("You may need to manually remove: {$workspacePath}");
+            }
+        }
+    }
 }
