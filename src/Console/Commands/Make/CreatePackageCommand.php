@@ -259,18 +259,42 @@ final class CreatePackageCommand extends BaseMakeCommand
     }
 
     /**
-     * Setup cleanup handlers for signal interruption.
+     * Setup cleanup handlers for signal interruption (Ctrl+C, SIGTERM).
+     *
+     * This method registers signal handlers using the Emitter pattern to ensure
+     * proper cleanup when the user cancels the operation or the process is terminated.
+     * It subscribes to two events:
+     * - signal.interrupt: Triggered when user presses Ctrl+C (SIGINT)
+     * - signal.terminate: Triggered when process receives SIGTERM
+     *
+     * Both handlers perform the same cleanup logic:
+     * 1. Display cancellation/termination message (unless in quiet/json mode)
+     * 2. Check if package directory was created
+     * 3. Call cleanupFailedWorkspace() to remove the package directory
+     *
+     * The handlers use closure variable references (&$packagePath, &$packageCreated)
+     * to access the current state of the creation process, allowing them to determine
+     * if cleanup is necessary.
+     *
+     * @param string|null &$packagePath    Reference to package path (updated during creation)
+     * @param bool        &$packageCreated Reference to creation flag (set to true when package dir is created)
+     * @param bool        $isQuiet         Suppress output messages
+     * @param bool        $isJson          Output in JSON format
      */
     private function setupCleanupHandlers(?string &$packagePath, bool &$packageCreated, bool $isQuiet, bool $isJson): void
     {
+        // Register global signal handlers (SIGINT, SIGTERM)
         $this->registerSignalHandlers();
 
+        // Subscribe to SIGINT event (Ctrl+C)
         $this->bindEvent('signal.interrupt', function () use (&$packagePath, &$packageCreated, $isQuiet, $isJson): void {
+            // Display cancellation message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Operation cancelled by user.');
             }
 
+            // Cleanup if package directory was created
             if ($packageCreated && $packagePath !== null) {
                 if (! $isQuiet && ! $isJson) {
                     $this->warning('Cleaning up...');
@@ -279,12 +303,15 @@ final class CreatePackageCommand extends BaseMakeCommand
             }
         });
 
+        // Subscribe to SIGTERM event (process termination)
         $this->bindEvent('signal.terminate', function () use (&$packagePath, &$packageCreated, $isQuiet, $isJson): void {
+            // Display termination message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Operation terminated.');
             }
 
+            // Cleanup if package directory was created
             if ($packageCreated && $packagePath !== null) {
                 if (! $isQuiet && ! $isJson) {
                     $this->warning('Cleaning up...');
@@ -295,10 +322,21 @@ final class CreatePackageCommand extends BaseMakeCommand
     }
 
     /**
-     * Display intro banner.
+     * Display intro banner and environment check message.
+     *
+     * Shows a welcoming banner with the command title and indicates that
+     * environment checks are being performed. This provides visual feedback
+     * to the user that the command has started and is validating the system.
+     *
+     * Output is suppressed in quiet mode (for CI/CD) and JSON mode (for
+     * programmatic usage).
+     *
+     * @param bool $isQuiet Suppress all output
+     * @param bool $isJson  Output in JSON format
      */
     private function displayIntro(bool $isQuiet, bool $isJson): void
     {
+        // Skip intro in quiet/json mode
         if (! $isQuiet && ! $isJson) {
             $this->intro('Package Creation');
             $this->info('Running environment checks...');
@@ -307,17 +345,34 @@ final class CreatePackageCommand extends BaseMakeCommand
 
     /**
      * Check environment with preflight checks.
+     *
+     * Validates that the development environment meets all requirements for
+     * creating a package. This includes checking for:
+     * - Required tools (PHP, Composer, Git)
+     * - Correct versions of dependencies
+     * - Proper system configuration
+     * - Available disk space
+     *
+     * If any checks fail, error messages are displayed and the method returns
+     * false to halt the creation process.
+     *
+     * @param  bool $isQuiet Suppress output messages
+     * @param  bool $isJson  Output in JSON format
+     * @return bool True if all checks passed, false otherwise
      */
     private function checkEnvironment(bool $isQuiet, bool $isJson): bool
     {
+        // Run all preflight checks
         $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
 
+        // Display errors if any checks failed
         if ($preflightResult->failed()) {
             $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
 
             return false;
         }
 
+        // Add spacing after checks (visual separation)
         if (! $isQuiet && ! $isJson) {
             $this->line('');
         }
@@ -327,13 +382,38 @@ final class CreatePackageCommand extends BaseMakeCommand
 
     /**
      * Select and validate package type.
+     *
+     * Determines which package type to create (Laravel, Symfony, Magento, Skeleton).
+     * The package type can be provided via the --type option or selected interactively.
+     *
+     * Process:
+     * 1. Check if --type option was provided
+     * 2. If not provided, prompt user to select from available types
+     * 3. Validate and create package type instance
+     * 4. Display selected package type name
+     *
+     * Package types:
+     * - Laravel: Package for Laravel applications with service providers
+     * - Symfony: Bundle for Symfony applications with dependency injection
+     * - Magento: Module for Magento with XML configuration
+     * - Skeleton: Generic PHP library with minimal dependencies
+     *
+     * If validation fails (invalid type or factory error), error messages are
+     * displayed and null is returned to halt the creation process.
+     *
+     * @param  InputInterface            $input   Command input (for reading --type option)
+     * @param  bool                      $isQuiet Suppress output messages
+     * @param  bool                      $isJson  Output in JSON format
+     * @return PackageTypeInterface|null Package type instance, or null if validation failed
      */
     private function selectPackageType(InputInterface $input, bool $isQuiet, bool $isJson): ?PackageTypeInterface
     {
         $type = $input->getOption('type');
         $packageTypeFactory = $this->packageTypeFactory();
 
+        // Check if type was provided via option
         if ($type === null) {
+            // Prompt user to select package type interactively
             $type = $this->select(
                 label: 'Select package type',
                 options: $packageTypeFactory->getTypeOptions(),
@@ -345,6 +425,7 @@ final class CreatePackageCommand extends BaseMakeCommand
         try {
             $packageType = $packageTypeFactory->create($type);
         } catch (InvalidArgumentException $invalidArgumentException) {
+            // Display error message
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
@@ -357,6 +438,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             return null;
         }
 
+        // Display selected package type
         if (! $isQuiet && ! $isJson) {
             $this->line('');
             $this->comment("Selected: {$packageType->getDisplayName()}");
@@ -369,7 +451,42 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Execute creation steps with progress feedback.
      *
-     * @return float Total duration in seconds
+     * Orchestrates the main package creation workflow by executing a series
+     * of steps in sequence. Each step is a closure that performs a specific task
+     * and returns a boolean indicating success/failure.
+     *
+     * Creation steps:
+     * 1. Checking name availability
+     *    - Verifies package name doesn't already exist
+     *    - Prevents accidental overwrites
+     *
+     * 2. Creating package structure
+     *    - Creates the package directory
+     *    - Sets up directory permissions
+     *
+     * 3. Generating configuration files
+     *    - Copies stub template files (composer.json, package.json, phpunit.xml, etc.)
+     *    - Replaces placeholders with actual values (name, namespace, description)
+     *    - Generates package-specific configuration
+     *
+     * 4. Installing dependencies (separate step)
+     *    - Runs composer install
+     *    - Installs PHPUnit, PHPStan, Pint
+     *    - Sets up autoloading
+     *
+     * Progress feedback:
+     * - In normal mode: Shows spinner with step message
+     * - In quiet/json mode: Executes silently
+     * - In verbose mode: Shows step duration
+     *
+     * @param  InputInterface       $input       Command input (for reading options)
+     * @param  string               $name        Package name
+     * @param  PackageTypeInterface $packageType Package type instance
+     * @param  string               $packagePath Full path to package directory
+     * @param  bool                 $isQuiet     Suppress output messages
+     * @param  bool                 $isJson      Output in JSON format
+     * @param  bool                 $isVerbose   Show detailed output
+     * @return float                Total duration in seconds
      */
     private function executeCreationSteps(
         InputInterface $input,
@@ -380,21 +497,25 @@ final class CreatePackageCommand extends BaseMakeCommand
         bool $isJson,
         bool $isVerbose
     ): float {
+        // Get package type for error messages
         $type = $input->getOption('type') ?? PackageType::SKELETON->value;
 
+        // Define creation steps as closures
         $steps = [
             'Checking name availability' => fn (): bool => $this->checkNameAvailability($name, $packagePath),
             'Creating package structure' => fn (): bool => $this->createPackageStructure($packagePath),
             'Generating configuration files' => fn (): bool => $this->generateConfigFiles($input, $name, $type, $packagePath, $packageType, $isVerbose),
         ];
 
+        // Track total duration
         $startTime = microtime(true);
 
+        // Execute each step in sequence
         foreach ($steps as $message => $step) {
             $this->executeStep($step, $message, $name, $type, $isQuiet, $isJson, $isVerbose);
         }
 
-        // Install dependencies
+        // Install dependencies (separate step with special handling)
         if (! $isQuiet && ! $isJson) {
             $this->line('');
         }
@@ -406,6 +527,36 @@ final class CreatePackageCommand extends BaseMakeCommand
 
     /**
      * Execute a single creation step.
+     *
+     * Runs a single step in the creation workflow and provides progress feedback.
+     * The step is executed as a closure that returns a boolean indicating success.
+     *
+     * Execution flow:
+     * 1. Record start time for duration tracking
+     * 2. Execute step (with or without spinner based on mode)
+     * 3. Check result - throw exception if step failed
+     * 4. Calculate step duration
+     * 5. Display completion message with optional duration
+     *
+     * Progress feedback modes:
+     * - Normal mode: Shows spinner during execution, completion message after
+     * - Quiet/JSON mode: Executes silently, no output
+     * - Verbose mode: Shows completion message with duration
+     *
+     * Error handling:
+     * - If step returns false, throws Exception with step message
+     * - Exception is caught by execute() method's try-catch block
+     * - Triggers cleanup and displays error message
+     *
+     * @param callable $step      Step closure to execute
+     * @param string   $message   Step description for display
+     * @param string   $name      Package name (for error messages)
+     * @param string   $type      Package type (for error messages)
+     * @param bool     $isQuiet   Suppress output messages
+     * @param bool     $isJson    Output in JSON format
+     * @param bool     $isVerbose Show detailed output
+     *
+     * @throws Exception If step fails (returns false)
      */
     private function executeStep(
         callable $step,
@@ -416,15 +567,21 @@ final class CreatePackageCommand extends BaseMakeCommand
         bool $isJson,
         bool $isVerbose
     ): void {
+        // Track step duration
         $stepStartTime = microtime(true);
 
+        // Execute step (with or without spinner)
         if ($isQuiet || $isJson) {
+            // Silent execution for CI/CD and programmatic usage
             $result = $step();
         } else {
+            // Show spinner during execution
             $result = $this->spin($step, "{$message}...");
         }
 
+        // Check if step failed
         if ($result === false) {
+            // Output error in JSON format if requested
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
@@ -434,20 +591,53 @@ final class CreatePackageCommand extends BaseMakeCommand
                 ]);
             }
 
+            // Throw exception to trigger cleanup
             throw new Exception("Failed: {$message}");
         }
 
+        // Calculate step duration
         $stepDuration = microtime(true) - $stepStartTime;
 
+        // Display completion message
         if (! $isQuiet && ! $isJson) {
             $this->comment("✓ {$message} complete");
         } elseif ($isVerbose && ! $isJson) {
+            // Show duration in verbose mode
             $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
         }
     }
 
     /**
      * Install package dependencies.
+     *
+     * Installs Composer dependencies for the package, including development
+     * dependencies like PHPUnit, PHPStan, and Pint. This step is separate
+     * from the main creation steps because it has special error handling
+     * (warnings instead of failures).
+     *
+     * Installation process:
+     * 1. Run composer install in package directory
+     * 2. Install PHPUnit for testing
+     * 3. Install PHPStan for static analysis
+     * 4. Install Pint for code formatting
+     * 5. Set up PSR-4 autoloading
+     *
+     * Error handling:
+     * - If installation succeeds: Display success message
+     * - If installation fails: Display warning (not error)
+     * - Failure doesn't halt package creation
+     * - User can manually run composer install later
+     *
+     * Progress feedback:
+     * - Normal mode: Shows spinner with "Installing dependencies..." message
+     * - Quiet/JSON mode: Executes silently
+     * - Verbose mode: Shows installation duration
+     *
+     * @param PackageTypeInterface $packageType Package type instance
+     * @param string               $packagePath Full path to package directory
+     * @param bool                 $isQuiet     Suppress output messages
+     * @param bool                 $isJson      Output in JSON format
+     * @param bool                 $isVerbose   Show detailed output
      */
     private function installPackageDependencies(
         PackageTypeInterface $packageType,
@@ -456,32 +646,66 @@ final class CreatePackageCommand extends BaseMakeCommand
         bool $isJson,
         bool $isVerbose
     ): void {
+        // Track installation duration
         $installStartTime = microtime(true);
 
+        // Execute installation (with or without spinner)
         if ($isQuiet || $isJson) {
+            // Silent execution
             $installResult = $this->installDependencies($packageType, $packagePath);
         } else {
+            // Show spinner during installation
             $installResult = $this->spin(
                 fn (): bool => $this->installDependencies($packageType, $packagePath),
                 'Installing dependencies...'
             );
         }
 
+        // Calculate installation duration
         $installDuration = microtime(true) - $installStartTime;
 
+        // Display result message
         if ($installResult) {
+            // Installation succeeded
             if (! $isQuiet && ! $isJson) {
                 $this->comment('✓ Dependencies installed successfully');
             } elseif ($isVerbose && ! $isJson) {
+                // Show duration in verbose mode
                 $this->comment(sprintf('✓ Dependencies installed successfully (%.2fs)', $installDuration));
             }
         } elseif (! $isQuiet && ! $isJson) {
+            // Installation failed - show warning (not error)
             $this->warning('⚠ Dependency installation had issues (you may need to run composer install manually)');
         }
     }
 
     /**
      * Handle command failure.
+     *
+     * Handles exceptions that occur during package creation by performing
+     * cleanup and displaying appropriate error messages.
+     *
+     * Cleanup process:
+     * 1. Check if package directory was created
+     * 2. Display cleanup message (unless in quiet/json mode)
+     * 3. Call cleanupFailedWorkspace() to delete the package directory
+     *
+     * Error message display:
+     * - JSON mode: Outputs structured error with success=false
+     * - Normal mode: Displays error message with exception details
+     *
+     * This method is called from the execute() method's catch block when any
+     * exception occurs during the creation process, including:
+     * - Step failures (from executeStep throwing Exception)
+     * - User cancellation (Ctrl+C via signal handlers)
+     * - Unexpected errors (file system, validation, etc.)
+     *
+     * @param  Exception   $exception      The exception that caused the failure
+     * @param  string|null $packagePath    Path to package directory (null if not created yet)
+     * @param  bool        $packageCreated Whether package directory was created
+     * @param  bool        $isQuiet        Suppress output messages
+     * @param  bool        $isJson         Output in JSON format
+     * @return int         Command::FAILURE exit code
      */
     private function handleFailure(
         Exception $exception,
@@ -492,21 +716,25 @@ final class CreatePackageCommand extends BaseMakeCommand
     ): int {
         // Cleanup on failure or cancellation
         if ($packageCreated && $packagePath !== null) {
+            // Display cleanup message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Cleaning up failed package...');
             }
 
+            // Remove package directory
             $this->cleanupFailedWorkspace($packagePath, $isQuiet, $isJson);
         }
 
         // Display error message
         if ($isJson) {
+            // Structured error output for programmatic usage
             $this->outputJson([
                 'success' => false,
                 'error' => $exception->getMessage(),
             ]);
         } else {
+            // Human-readable error message
             $this->error('Package creation failed: ' . $exception->getMessage());
         }
 
