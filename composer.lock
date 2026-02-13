@@ -727,12 +727,12 @@
             "version": "v1.0.1",
             "source": {
                 "type": "git",
-                "url": "https://github.com/pixielity-co/stub-generator.git",
+                "url": "https://github.com/pixielity-inc/stub-generator.git",
                 "reference": "ac6fe066c728739cd0c5dccb0258de169d54f4c3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pixielity-co/stub-generator/zipball/ac6fe066c728739cd0c5dccb0258de169d54f4c3",
+                "url": "https://api.github.com/repos/pixielity-inc/stub-generator/zipball/ac6fe066c728739cd0c5dccb0258de169d54f4c3",
                 "reference": "ac6fe066c728739cd0c5dccb0258de169d54f4c3",
                 "shasum": ""
             },
@@ -765,7 +765,7 @@
                 }
             ],
             "description": "A powerful, fluent stub template processor for PHP with support for placeholders and optional sections",
-            "homepage": "https://github.com/pixielity-co/stub-generator",
+            "homepage": "https://github.com/pixielity-inc/stub-generator",
             "keywords": [
                 "code-generation",
                 "generator",
@@ -776,9 +776,9 @@
                 "template"
             ],
             "support": {
-                "docs": "https://github.com/pixielity-co/stub-generator#readme",
-                "issues": "https://github.com/pixielity-co/stub-generator/issues",
-                "source": "https://github.com/pixielity-co/stub-generator"
+                "docs": "https://github.com/pixielity-inc/stub-generator#readme",
+                "issues": "https://github.com/pixielity-inc/stub-generator/issues",
+                "source": "https://github.com/pixielity-inc/stub-generator"
             },
             "time": "2026-02-12T13:58:35+00:00"
         },

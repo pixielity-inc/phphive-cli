@@ -13,7 +13,7 @@
         "build-tool",
         "developer-tools"
     ],
-    "homepage": "https://github.com/pixielity-co/phphive-cli",
+    "homepage": "https://github.com/pixielity-inc/phphive-cli",
     "license": "MIT",
     "authors": [
         {
@@ -22,9 +22,9 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/pixielity-co/phphive-cli/issues",
-        "source": "https://github.com/pixielity-co/phphive-cli",
-        "docs": "https://github.com/pixielity-co/phphive-cli#readme"
+        "issues": "https://github.com/pixielity-inc/phphive-cli/issues",
+        "source": "https://github.com/pixielity-inc/phphive-cli",
+        "docs": "https://github.com/pixielity-inc/phphive-cli#readme"
     },
     "require": {
         "php": "^8.4",
