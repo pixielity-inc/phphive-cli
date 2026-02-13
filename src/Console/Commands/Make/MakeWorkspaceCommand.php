@@ -563,13 +563,44 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
     /**
      * Get and validate workspace name with smart suggestions.
      *
-     * @return string Validated workspace name
+     * Obtains and validates the workspace name through multiple strategies:
+     * 1. From command argument (if provided)
+     * 2. From interactive prompt (if in interactive mode)
+     * 3. From smart suggestions (if name is already taken)
+     *
+     * Validation rules:
+     * - Must be lowercase alphanumeric with hyphens
+     * - Pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+     * - Examples: my-project, awesome-app, project-2024
+     * - Invalid: MyProject, my_project, project., -project
+     *
+     * Name availability check:
+     * - Checks if directory already exists in current working directory
+     * - If taken, generates smart suggestions using NameSuggestionService
+     * - Suggestions include: suffixes (-v2, -new), prefixes (my-, new-), variations
+     *
+     * Interactive mode:
+     * - Prompts user for name if not provided
+     * - Shows inline validation errors
+     * - Displays suggestions if name is taken
+     * - Allows custom name entry
+     *
+     * Non-interactive mode:
+     * - Requires name as argument
+     * - Exits with error if name not provided or invalid
+     * - No prompts or suggestions
+     *
+     * @param  InputInterface $input   Command input (for reading argument and checking interactive mode)
+     * @param  bool           $isQuiet Suppress output messages
+     * @param  bool           $isJson  Output in JSON format
+     * @return string         Validated workspace name
      */
     private function getValidatedWorkspaceName(InputInterface $input, bool $isQuiet, bool $isJson): string
     {
         // Get workspace name from argument or prompt
         $name = $this->argument('name');
 
+        // Check if running in non-interactive mode without name
         if (($name === null || $name === '') && ! $input->isInteractive()) {
             // Non-interactive mode without name - error
             $errorMsg = 'Workspace name is required in non-interactive mode';
@@ -584,8 +615,9 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
+        // Prompt for name if not provided (interactive mode only)
         if ($name === null || $name === '') {
-            // Interactive mode - prompt for name
+            // Interactive mode - prompt for name with inline validation
             $name = $this->text(
                 label: 'What is the workspace name?',
                 placeholder: 'my-project',
@@ -594,7 +626,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             );
         }
 
-        // Validate workspace name (inline validation)
+        // Validate workspace name format (inline validation)
         if (! is_string($name) || $name === '' || preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $name) !== 1) {
             $errorMsg = 'Workspace name must be lowercase alphanumeric with hyphens (e.g., my-project)';
             if ($isJson) {
@@ -610,6 +642,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
 
         // Check if directory already exists
         if (! $this->checkDirectoryExists($name, $name, 'workspace', $isQuiet, $isJson)) {
+            // Name is available
             return $name;
         }
 
@@ -618,6 +651,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             $this->line('');
         }
 
+        // Generate smart suggestions using NameSuggestionService
         $nameSuggestionService = NameSuggestionService::make();
         $suggestions = $nameSuggestionService->suggest(
             $name,
@@ -625,6 +659,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             fn (?string $suggestedName): bool => is_string($suggestedName) && $suggestedName !== '' && ! $this->filesystem()->isDirectory($suggestedName)
         );
 
+        // Check if suggestions were generated
         if ($suggestions === []) {
             $errorMsg = 'Could not generate alternative names. Please choose a different name.';
             if ($isJson) {
@@ -638,7 +673,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
-        // Get the best suggestion
+        // Get the best suggestion (highest score)
         $bestSuggestion = $nameSuggestionService->getBestSuggestion($suggestions);
 
         // Display suggestions with recommendation
@@ -663,7 +698,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             required: true
         );
 
-        // Validate the chosen name
+        // Validate the chosen name availability
         if ($this->filesystem()->isDirectory($choice)) {
             $errorMsg = "Directory '{$choice}' also exists. Please try again with a different name.";
             if ($isJson) {
@@ -677,6 +712,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
+        // Display success message
         if (! $isQuiet && ! $isJson) {
             $this->info("✓ Workspace name '{$choice}' is available");
         }
@@ -687,22 +723,47 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
     /**
      * Clone the template repository from GitHub.
      *
-     * Clones the official PhpHive template repository and removes the .git
-     * directory to allow for a fresh git initialization.
+     * Clones the official PhpHive template repository from GitHub and removes
+     * the .git directory to allow for a fresh git initialization.
+     *
+     * Template repository:
+     * - URL: https://github.com/pixielity-inc/hive-template.git
+     * - Contains: Sample app, sample package, complete monorepo structure
+     * - Includes: Turborepo config, pnpm workspace, composer setup
+     *
+     * Clone process:
+     * 1. Execute git clone command with workspace name as target directory
+     * 2. Wait for clone to complete (5 minute timeout)
+     * 3. Remove .git directory to allow fresh git initialization
+     * 4. Return exit code (0 for success, non-zero for failure)
+     *
+     * Verbose mode:
+     * - Shows git clone command being executed
+     * - Displays git output in real-time
+     * - Shows rm command for .git directory removal
+     *
+     * Common failure scenarios:
+     * - Network issues (no internet connection)
+     * - Invalid repository URL
+     * - Insufficient disk space
+     * - Permission issues
+     * - Timeout (clone takes longer than 5 minutes)
      *
      * @param  string $name      Workspace name (directory to clone into)
-     * @param  bool   $isVerbose Show verbose output
+     * @param  bool   $isVerbose Show verbose output (commands and git output)
      * @return int    Exit code (0 for success, non-zero for failure)
      */
     private function cloneTemplate(string $name, bool $isVerbose): int
     {
-        // Clone the template repository
+        // Build git clone command
         $cloneCommand = 'git clone ' . self::TEMPLATE_URL . " {$name}";
 
+        // Display command in verbose mode
         if ($isVerbose) {
             $this->comment("  Executing: {$cloneCommand}");
         }
 
+        // Create process with 5 minute timeout
         $process = Process::fromShellCommandline(
             $cloneCommand,
             null,
@@ -711,12 +772,14 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             300 // 5 minute timeout
         );
 
+        // Execute clone command
         if ($isVerbose) {
-            // Show output in verbose mode
+            // Show output in verbose mode (real-time git progress)
             $process->run(function ($type, $buffer): void {
                 echo $buffer;
             });
         } else {
+            // Silent execution
             $process->run();
         }
 
@@ -736,24 +799,55 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
     /**
      * Update workspace configuration with the new name.
      *
-     * Updates package.json and composer.json with the new workspace name,
-     * then initializes a fresh git repository.
+     * Updates configuration files with the new workspace name and initializes
+     * a fresh git repository with an initial commit.
+     *
+     * Configuration updates:
+     * 1. package.json
+     *    - Updates "name" field to workspace name
+     *    - Preserves all other fields (scripts, workspaces, etc.)
+     *
+     * 2. composer.json
+     *    - Updates "name" field to "phphive/{workspace-name}"
+     *    - Preserves all other fields (autoload, repositories, etc.)
+     *
+     * 3. Git initialization
+     *    - Runs: git init
+     *    - Runs: git add .
+     *    - Runs: git commit -m "Initial commit from hive-template"
+     *
+     * File handling:
+     * - Reads JSON files with json_decode()
+     * - Updates specific fields
+     * - Writes back with pretty printing (JSON_PRETTY_PRINT)
+     * - Preserves formatting with JSON_UNESCAPED_SLASHES
+     * - Adds newline at end of file
+     *
+     * Error handling:
+     * - Returns false if any step fails
+     * - Catches all exceptions
+     * - Doesn't display error messages (handled by caller)
      *
      * @param  string $name Workspace name
-     * @return bool   True on success
+     * @return bool   True on success, false on failure
      */
     private function updateWorkspaceConfig(string $name): bool
     {
         try {
             $filesystem = $this->filesystem();
 
-            // Update package.json
+            // Update package.json with workspace name
             $packageJsonPath = "{$name}/package.json";
             if ($filesystem->exists($packageJsonPath)) {
+                // Read existing package.json
                 $content = $filesystem->read($packageJsonPath);
                 $packageJson = json_decode($content, true);
+
+                // Update name field
                 if (is_array($packageJson)) {
                     $packageJson['name'] = $name;
+
+                    // Write back with pretty printing
                     $filesystem->write(
                         $packageJsonPath,
                         json_encode($packageJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
@@ -761,14 +855,18 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
                 }
             }
 
-            // Update composer.json
+            // Update composer.json with vendor/package format
             $composerJsonPath = "{$name}/composer.json";
             if ($filesystem->exists($composerJsonPath)) {
+                // Read existing composer.json
                 $content = $filesystem->read($composerJsonPath);
                 $composerJson = json_decode($content, true);
+
+                // Update name field to vendor/package format
                 if (is_array($composerJson)) {
-                    // Update name to vendor/package format
                     $composerJson['name'] = "phphive/{$name}";
+
+                    // Write back with pretty printing
                     $filesystem->write(
                         $composerJsonPath,
                         json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
@@ -776,11 +874,13 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
                 }
             }
 
-            // Initialize new git repository
+            // Initialize new git repository with initial commit
+            // Commands: git init && git add . && git commit -m "Initial commit from hive-template"
             exec("cd {$name} && git init && git add . && git commit -m 'Initial commit from hive-template' 2>&1");
 
             return true;
         } catch (Exception) {
+            // Return false on any error (caller will handle error display)
             return false;
         }
     }
