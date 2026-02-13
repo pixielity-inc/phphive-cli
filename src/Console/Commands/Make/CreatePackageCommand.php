@@ -744,13 +744,43 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Get and validate package name with smart suggestions.
      *
-     * @return string Validated package name
+     * Obtains and validates the package name from command argument with
+     * smart suggestions if the name is already taken.
+     *
+     * Validation rules:
+     * - Must be lowercase alphanumeric with hyphens
+     * - Pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+     * - Examples: logger, http-client, database-adapter
+     * - Invalid: Logger, http_client, -logger, logger-
+     *
+     * Name availability check:
+     * - Checks if directory already exists in packages/ directory
+     * - If taken, generates smart suggestions using NameSuggestionService
+     * - Suggestions include: suffixes (-v2, -new), prefixes (my-, new-), variations
+     *
+     * Smart suggestions:
+     * - Generated based on original name
+     * - Filtered to ensure valid format (lowercase alphanumeric with hyphens)
+     * - Filtered to ensure availability (directory doesn't exist)
+     * - Best suggestion is highlighted as "recommended"
+     * - User can select from suggestions or enter custom name
+     *
+     * Error handling:
+     * - Exits with Command::FAILURE if name is invalid or unavailable
+     * - Displays error in JSON format if --json flag is set
+     * - Displays human-readable error otherwise
+     *
+     * @param  InputInterface $input   Command input (for reading name argument)
+     * @param  bool           $isQuiet Suppress output messages
+     * @param  bool           $isJson  Output in JSON format
+     * @return string         Validated package name
      */
     private function getValidatedPackageName(InputInterface $input, bool $isQuiet, bool $isJson): string
     {
+        // Get package name from command argument
         $name = $input->getArgument('name');
 
-        // Validate the name format first (inline validation)
+        // Validate that name was provided
         if (! is_string($name) || $name === '') {
             $errorMsg = 'Package name is required';
             if ($isJson) {
@@ -764,6 +794,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
+        // Validate name format (lowercase alphanumeric with hyphens)
         if (preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $name) !== 1) {
             $errorMsg = 'Package name must be lowercase alphanumeric with hyphens (e.g., my-package)';
             if ($isJson) {
@@ -777,11 +808,13 @@ final class CreatePackageCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
+        // Build package path
         $root = $this->getMonorepoRoot();
         $packagePath = "{$root}/packages/{$name}";
 
         // Check if name is available
         if (! $this->checkDirectoryExists($name, $packagePath, 'package', $isQuiet, $isJson)) {
+            // Name is available
             return $name;
         }
 
@@ -790,13 +823,16 @@ final class CreatePackageCommand extends BaseMakeCommand
             $this->line('');
         }
 
+        // Generate smart suggestions using NameSuggestionService
         $nameSuggestionService = NameSuggestionService::make();
         $suggestions = $nameSuggestionService->suggest(
             $name,
             'package',
+            // Filter suggestions: valid format and available
             fn (?string $suggestedName): bool => is_string($suggestedName) && $suggestedName !== '' && preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $suggestedName) === 1 && ! $this->filesystem()->isDirectory("{$root}/packages/{$suggestedName}")
         );
 
+        // Check if suggestions were generated
         if ($suggestions === []) {
             $errorMsg = 'Could not generate alternative names. Please choose a different name.';
             if ($isJson) {
@@ -810,7 +846,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
-        // Get the best suggestion
+        // Get the best suggestion (highest score)
         $bestSuggestion = $nameSuggestionService->getBestSuggestion($suggestions);
 
         // Display suggestions with recommendation
@@ -835,7 +871,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             required: true
         );
 
-        // Validate the chosen name format (inline validation)
+        // Validate the chosen name format
         if (! is_string($choice) || $choice === '' || preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $choice) !== 1) {
             $errorMsg = 'Invalid package name format';
             if ($isJson) {
@@ -864,6 +900,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             exit(Command::FAILURE);
         }
 
+        // Display success message
         if (! $isQuiet && ! $isJson) {
             $this->info("✓ Package name '{$choice}' is available");
         }
@@ -874,12 +911,16 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Check if package name is available.
      *
-     * @param  string $name        Package name
-     * @param  string $packagePath Full package path
-     * @return bool   True if available
+     * Verifies that a package with the given name doesn't already exist
+     * in the packages/ directory. This prevents accidental overwrites.
+     *
+     * @param  string $name        Package name to check
+     * @param  string $packagePath Full path to package directory
+     * @return bool   True if available (directory doesn't exist), false if taken
      */
     private function checkNameAvailability(string $name, string $packagePath): bool
     {
+        // Check if directory already exists
         if ($this->filesystem()->isDirectory($packagePath)) {
             $this->error("Package '{$name}' already exists");
 
@@ -892,12 +933,20 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Create package directory structure.
      *
-     * @param  string $packagePath Full package path
-     * @return bool   True on success
+     * Creates the root package directory with proper permissions.
+     * Subdirectories (src/, tests/) are created later by stub processing.
+     *
+     * Directory permissions:
+     * - 0755: Owner can read/write/execute, group and others can read/execute
+     * - Recursive: Creates parent directories if needed
+     *
+     * @param  string $packagePath Full path to package directory
+     * @return bool   True on success, false on failure
      */
     private function createPackageStructure(string $packagePath): bool
     {
         try {
+            // Create package directory with proper permissions
             $this->filesystem()->makeDirectory($packagePath, 0755, true);
 
             return true;
@@ -911,13 +960,39 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Generate configuration files from stubs.
      *
-     * @param  InputInterface       $input       Command input
+     * Copies and processes stub template files to generate package configuration.
+     * Stubs are template files with placeholders that get replaced with actual values.
+     *
+     * Generated files:
+     * - composer.json: PHP dependencies, autoloading, package metadata
+     * - package.json: Turbo tasks, npm scripts
+     * - phpunit.xml: PHPUnit configuration for testing
+     * - README.md: Package documentation
+     * - src/.gitkeep: Preserves empty src directory
+     * - tests/Unit/.gitkeep: Preserves empty tests directory
+     *
+     * Stub processing:
+     * 1. Get stub path for selected package type
+     * 2. Verify stub directory exists
+     * 3. Prepare variables for placeholder replacement:
+     *    - {{NAME}}: Package name (e.g., logger)
+     *    - {{NAMESPACE}}: PSR-4 namespace (e.g., PhpHive\Logger)
+     *    - {{DESCRIPTION}}: Package description
+     *    - {{COMPOSER_NAME}}: Composer package name (e.g., phphive/logger)
+     * 4. Copy and process all stub files
+     * 5. Apply file naming rules (e.g., rename placeholders in filenames)
+     *
+     * Verbose mode:
+     * - Shows "Processing stub files..." message
+     * - Displays each file being created
+     *
+     * @param  InputInterface       $input       Command input (for reading --description option)
      * @param  string               $name        Package name
-     * @param  string               $type        Package type
-     * @param  string               $packagePath Full package path
+     * @param  string               $type        Package type (for error messages)
+     * @param  string               $packagePath Full path to package directory
      * @param  PackageTypeInterface $packageType Package type instance
      * @param  bool                 $isVerbose   Show verbose output
-     * @return bool                 True on success
+     * @return bool                 True on success, false on failure
      */
     private function generateConfigFiles(InputInterface $input, string $name, string $type, string $packagePath, PackageTypeInterface $packageType, bool $isVerbose): bool
     {
@@ -926,6 +1001,7 @@ final class CreatePackageCommand extends BaseMakeCommand
             $stubsBasePath = dirname(__DIR__, 4) . '/stubs';
             $stubPath = $packageType->getStubPath($stubsBasePath);
 
+            // Verify stub directory exists
             if (! $this->filesystem()->isDirectory($stubPath)) {
                 $this->error("Stub directory not found for package type '{$type}' at: {$stubPath}");
 
@@ -933,9 +1009,11 @@ final class CreatePackageCommand extends BaseMakeCommand
             }
 
             // Prepare stub variables using package type
+            // Gets description from --description option or uses default
             $description = $input->getOption('description') ?? "A {$type} package";
             $variables = $packageType->prepareVariables($name, $description);
 
+            // Display processing message in verbose mode
             if ($isVerbose) {
                 $this->comment('  Processing stub files...');
             }
@@ -954,18 +1032,36 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Install package dependencies.
      *
+     * Runs composer install in the package directory to install all dependencies
+     * defined in composer.json. This includes:
+     * - PHPUnit for testing
+     * - PHPStan for static analysis
+     * - Pint for code formatting
+     * - Any other dev dependencies
+     *
+     * The installation is delegated to the package type's postCreate() method,
+     * which handles the actual composer install command execution.
+     *
+     * Error handling:
+     * - Returns false if installation fails
+     * - Doesn't throw exceptions (errors are logged but don't fail the command)
+     * - Allows package creation to complete even if dependencies fail to install
+     * - User can manually run composer install later if needed
+     *
      * @param  PackageTypeInterface $packageType Package type instance
-     * @param  string               $packagePath Full package path
-     * @return bool                 True on success
+     * @param  string               $packagePath Full path to package directory
+     * @return bool                 True on success, false on failure
      */
     private function installDependencies(PackageTypeInterface $packageType, string $packagePath): bool
     {
         try {
+            // Delegate to package type's postCreate method
             $packageType->postCreate($packagePath);
 
             return true;
         } catch (Exception) {
             // Log error but don't fail the command
+            // User can manually run composer install later
             return false;
         }
     }
@@ -973,31 +1069,69 @@ final class CreatePackageCommand extends BaseMakeCommand
     /**
      * Copy stub files to package directory with variable replacement.
      *
-     * @param string                $stubPath    Source stub directory
-     * @param string                $packagePath Destination package directory
-     * @param array<string, string> $variables   Variables for template replacement
-     * @param Filesystem            $filesystem  Filesystem service
-     * @param array<string, string> $namingRules File naming rules for special files
-     * @param bool                  $isVerbose   Show verbose output
+     * Recursively copies all stub template files from the stub directory to the
+     * package directory, replacing placeholders with actual values and applying
+     * file naming rules.
+     *
+     * Stub processing:
+     * 1. Set base path for Stub facade
+     * 2. Iterate through all files and directories recursively
+     * 3. For directories: Create in destination with proper permissions
+     * 4. For files:
+     *    a. Remove .stub extension if present
+     *    b. Apply naming rules (rename files based on variables)
+     *    c. Escape backslashes for JSON files (namespace values)
+     *    d. Process template with Stub facade (replace placeholders)
+     *    e. Save to destination
+     *
+     * File naming rules:
+     * - Pattern matching: Compares normalized paths (no leading slashes)
+     * - Variable replacement: Converts {{UPPERCASE}} placeholders
+     * - Example: "src/{{NAMESPACE}}.php" → "src/PhpHive/Logger.php"
+     *
+     * JSON file handling:
+     * - Escapes backslashes in namespace values
+     * - Single backslash → Double backslash (for JSON encoding)
+     * - Example: "PhpHive\Logger" → "PhpHive\\Logger"
+     *
+     * Verbose mode:
+     * - Displays each file being created
+     * - Shows relative path from package root
+     *
+     * Error handling:
+     * - Catches StubNotFoundException for missing stub files
+     * - Logs error and continues with next file
+     * - Doesn't halt the entire process for single file failures
+     *
+     * @param string                $stubPath    Source stub directory path
+     * @param string                $packagePath Destination package directory path
+     * @param array<string, string> $variables   Variables for template replacement (name, namespace, description, etc.)
+     * @param Filesystem            $filesystem  Filesystem service instance
+     * @param array<string, string> $namingRules File naming rules for special files (pattern => replacement)
+     * @param bool                  $isVerbose   Show verbose output (display each file being created)
      */
     private function copyStubFiles(string $stubPath, string $packagePath, array $variables, Filesystem $filesystem, array $namingRules = [], bool $isVerbose = false): void
     {
         // Set base path for Stub facade
         Stub::setBasePath($stubPath);
 
+        // Create recursive iterator for all files and directories
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($stubPath, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Process each item (file or directory)
         foreach ($iterator as $item) {
+            // Get relative path from stub directory
             $relativePath = substr($item->getPathname(), strlen($stubPath) + 1);
             $destinationPath = $packagePath . '/' . $relativePath;
 
             if ($item->isDir()) {
+                // Create directory with proper permissions
                 $filesystem->makeDirectory($destinationPath, 0755, true);
             } else {
-                // Remove .stub extension if present
+                // Process file: remove .stub extension
                 $targetPath = $relativePath;
                 if (str_ends_with($targetPath, '.stub')) {
                     $targetPath = substr($targetPath, 0, -5);
@@ -1009,6 +1143,7 @@ final class CreatePackageCommand extends BaseMakeCommand
                     $normalizedPattern = ltrim($pattern, '/');
                     $normalizedTarget = ltrim($targetPath, '/');
 
+                    // Check if this file matches the naming rule pattern
                     if ($normalizedTarget === $normalizedPattern) {
                         // Convert variable keys to {{UPPERCASE}} format for replacement
                         $replacementVars = [];
@@ -1036,6 +1171,7 @@ final class CreatePackageCommand extends BaseMakeCommand
                     $variablesToUse[PackageTypeInterface::NAMESPACE] = str_replace('\\', '\\\\', $namespace);
                 }
 
+                // Display file being created in verbose mode
                 if ($isVerbose) {
                     $this->comment("    Creating: {$targetPath}");
                 }
