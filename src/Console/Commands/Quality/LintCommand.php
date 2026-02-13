@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Quality;
 
-use function count;
-
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Application;
@@ -73,12 +71,25 @@ final class LintCommand extends BaseCommand
     {
         parent::configure();
 
-        $this->addOption(
-            'fix',
-            null,
-            InputOption::VALUE_NONE,
-            'Auto-fix issues (delegates to format command)',
-        );
+        $this
+            ->addOption(
+                'fix',
+                null,
+                InputOption::VALUE_NONE,
+                'Auto-fix issues (delegates to format command)',
+            )
+            ->addOption(
+                'json',
+                'j',
+                InputOption::VALUE_NONE,
+                'Output results as JSON (for CI/CD integration)',
+            )
+            ->addOption(
+                'table',
+                null,
+                InputOption::VALUE_NONE,
+                'Display issue summary in table format',
+            );
     }
 
     /**
@@ -99,15 +110,27 @@ final class LintCommand extends BaseCommand
         // Extract options from user input
         $workspace = $this->option('workspace');
         $fix = $this->hasOption('fix');
+        $jsonMode = $this->hasOption('json');
+        $tableMode = $this->hasOption('table');
 
         // If fix is requested, delegate to format command
         // This provides a convenient shortcut: lint --fix = format
         if ($fix) {
-            $this->info('Auto-fix enabled, running format command...');
+            if (! $jsonMode) {
+                $this->info('Auto-fix enabled, running format command...');
+            }
 
             $application = $this->getApplication();
             if (! $application instanceof Application) {
-                $this->error('Application not available');
+                if ($jsonMode) {
+                    $this->outputJson([
+                        'status' => 'error',
+                        'message' => 'Application not available',
+                        'timestamp' => date('c'),
+                    ]);
+                } else {
+                    $this->error('Application not available');
+                }
 
                 return Command::FAILURE;
             }
@@ -115,17 +138,18 @@ final class LintCommand extends BaseCommand
             return $application->find('format')->run($input, $output);
         }
 
-        // Display intro banner
-        $this->intro('Checking Code Style');
-
+        // Display intro banner (skip in JSON mode)
         // Show what we're linting
-        if (is_string($workspace) && $workspace !== '') {
-            // Linting specific workspace
-            $this->info("Linting workspace: {$workspace}");
-        } else {
-            // Linting all workspaces
-            $workspaces = $this->getWorkspaces();
-            $this->info('Linting ' . count($workspaces) . ' workspace(s)');
+        if (! $jsonMode) {
+            $this->intro('Checking Code Style');
+            if (is_string($workspace) && $workspace !== '') {
+                // Linting specific workspace
+                $this->info("Linting workspace: {$workspace}");
+            } else {
+                // Linting all workspaces
+                $workspaces = $this->getWorkspaces();
+                $this->info('Linting ' . $workspaces->count() . ' workspace(s)');
+            }
         }
 
         // Build Turbo options array
@@ -136,10 +160,26 @@ final class LintCommand extends BaseCommand
             $options['filter'] = $workspace;
         }
 
+        // Capture start time for metrics
+        $startTime = microtime(true);
+
         // Run the lint task via Turbo
         // Each workspace runs: vendor/bin/pint --test
         $exitCode = $this->turboRun('lint', $options);
 
+        // Calculate duration
+        $duration = round(microtime(true) - $startTime, 2);
+
+        // Handle different output modes
+        if ($jsonMode) {
+            return $this->outputJsonResults($exitCode, $workspace, $duration);
+        }
+
+        if ($tableMode) {
+            return $this->outputTableResults($exitCode, $workspace, $duration);
+        }
+
+        // Default output mode
         // Report results to user
         if ($exitCode === 0) {
             // Success - no style violations found
@@ -153,5 +193,78 @@ final class LintCommand extends BaseCommand
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Output lint results in JSON format for CI/CD integration.
+     *
+     * @param  int         $exitCode  Lint execution exit code
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputJsonResults(
+        int $exitCode,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $data = [
+            'status' => $exitCode === 0 ? 'success' : 'failure',
+            'task' => 'lint',
+            'exitCode' => $exitCode,
+            'duration' => $duration,
+            'timestamp' => date('c'),
+        ];
+
+        if ($workspace !== null && is_string($workspace) && $workspace !== '') {
+            $data['workspace'] = $workspace;
+        }
+
+        if ($exitCode !== 0) {
+            $data['message'] = 'Code style issues found. Run "hive format" to auto-fix.';
+        }
+
+        $this->outputJson($data);
+
+        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    /**
+     * Output lint results in table format.
+     *
+     * @param  int         $exitCode  Lint execution exit code
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputTableResults(
+        int $exitCode,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $this->line('');
+        $this->line('Lint Summary');
+        $this->line('');
+
+        $rows = [
+            ['Task', 'lint'],
+            ['Status', $exitCode === 0 ? '✓ Passed' : '✗ Failed'],
+            ['Duration', $duration . 's'],
+        ];
+
+        if ($workspace !== null && is_string($workspace) && $workspace !== '') {
+            $rows[] = ['Workspace', $workspace];
+        } else {
+            $rows[] = ['Workspace', 'All'];
+        }
+
+        $this->table(['Property', 'Value'], $rows);
+
+        if ($exitCode !== 0) {
+            $this->line('');
+            $this->info('Run "hive format" to auto-fix issues');
+        }
+
+        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 }

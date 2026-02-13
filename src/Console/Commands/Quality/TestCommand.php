@@ -115,6 +115,24 @@ final class TestCommand extends BaseCommand
                 InputOption::VALUE_REQUIRED,
                 'Filter tests by pattern',
             )
+            ->addOption(
+                'json',
+                'j',
+                InputOption::VALUE_NONE,
+                'Output results as JSON (for CI/CD integration)',
+            )
+            ->addOption(
+                'table',
+                null,
+                InputOption::VALUE_NONE,
+                'Display test summary in table format',
+            )
+            ->addOption(
+                'summary',
+                's',
+                InputOption::VALUE_NONE,
+                'Show quick overview only',
+            )
             ->setHelp(
                 <<<'HELP'
                 The <info>test</info> command runs PHPUnit tests across workspaces.
@@ -126,6 +144,9 @@ final class TestCommand extends BaseCommand
                   <info>hive test --feature</info>            Run feature tests only
                   <info>hive test --coverage</info>           Generate coverage report
                   <info>hive test --filter=UserTest</info>    Filter by test name
+                  <info>hive test --json</info>               Output as JSON for CI/CD
+                  <info>hive test --table</info>              Show summary table
+                  <info>hive test --summary</info>            Quick overview only
 
                 Tests run in parallel using Turborepo for optimal performance.
                 HELP
@@ -149,12 +170,19 @@ final class TestCommand extends BaseCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        // Display intro banner
-        $this->intro('Running tests...');
+        // Check for JSON output mode first
+        $jsonMode = $this->hasOption('json');
+        $tableMode = $this->hasOption('table');
+        $summaryMode = $this->hasOption('summary');
+
+        // Display intro banner (skip in JSON mode)
+        if (! $jsonMode) {
+            $this->intro('Running tests...');
+        }
 
         // Determine which test task to run based on options
         // This selects between test, test:unit, test:feature, or test:coverage
-        $task = $this->determineTestTask();
+        $task = $this->determineTestTask($jsonMode);
 
         // Build Turbo options array
         $options = [];
@@ -165,15 +193,24 @@ final class TestCommand extends BaseCommand
             // Verify workspace exists before proceeding
             // This prevents cryptic errors from Turbo
             if (! $this->hasWorkspace($workspace)) {
-                $this->error("Workspace '{$workspace}' not found");
+                if ($jsonMode) {
+                    $this->outputJson([
+                        'status' => 'error',
+                        'message' => "Workspace '{$workspace}' not found",
+                        'timestamp' => date('c'),
+                    ]);
+                } else {
+                    $this->error("Workspace '{$workspace}' not found");
+                }
 
                 return self::FAILURE;
             }
-
             // Filter to specific workspace
             $options['filter'] = $workspace;
-            $this->comment("Workspace: {$workspace}");
-        } else {
+            if (! $jsonMode && ! $summaryMode) {
+                $this->comment("Workspace: {$workspace}");
+            }
+        } elseif (! $jsonMode && ! $summaryMode) {
             // Running tests in all workspaces
             $this->comment('Running tests in all workspaces');
         }
@@ -181,16 +218,38 @@ final class TestCommand extends BaseCommand
         // Show test name filter if specified
         // This is passed to PHPUnit's --filter option
         $filter = $input->getOption('filter');
-        if (is_string($filter) && $filter !== '') {
+        if (is_string($filter) && $filter !== '' && ! $jsonMode && ! $summaryMode) {
             $this->comment("Filter: {$filter}");
         }
 
-        $this->line('');
+        if (! $jsonMode && ! $summaryMode) {
+            $this->line('');
+        }
+
+        // Capture start time for metrics
+        $startTime = microtime(true);
 
         // Run the test task via Turbo
         // Turbo will handle parallel execution and caching
         $exitCode = $this->turboRun($task, $options);
 
+        // Calculate duration
+        $duration = round(microtime(true) - $startTime, 2);
+
+        // Handle different output modes
+        if ($jsonMode) {
+            return $this->outputJsonResults($exitCode, $task, $workspace, $filter, $duration);
+        }
+
+        if ($tableMode) {
+            return $this->outputTableResults($exitCode, $task, $workspace, $duration);
+        }
+
+        if ($summaryMode) {
+            return $this->outputSummaryResults($exitCode, $task, $workspace, $duration);
+        }
+
+        // Default output mode
         $this->line('');
 
         // Report results to user
@@ -214,31 +273,133 @@ final class TestCommand extends BaseCommand
      * - --coverage → test:coverage
      * - (none) → test (all tests)
      *
+     * @param  bool   $jsonMode Whether JSON output mode is enabled
      * @return string Turbo task name to execute
      */
-    private function determineTestTask(): string
+    private function determineTestTask(bool $jsonMode = false): string
     {
         // Check for unit tests flag
         if ($this->hasOption('unit')) {
-            $this->info('Running unit tests...');
+            if (! $jsonMode) {
+                $this->info('Running unit tests...');
+            }
 
             return 'test:unit';
         }
         // Check for feature tests flag
         if ($this->hasOption('feature')) {
-            $this->info('Running feature tests...');
+            if (! $jsonMode) {
+                $this->info('Running feature tests...');
+            }
 
             return 'test:feature';
         }
         // Check for coverage flag
         if ($this->hasOption('coverage')) {
-            $this->info('Running tests with coverage...');
+            if (! $jsonMode) {
+                $this->info('Running tests with coverage...');
+            }
 
             return 'test:coverage';
         }
         // Default: run all tests
-        $this->info('Running all tests...');
+        if (! $jsonMode) {
+            $this->info('Running all tests...');
+        }
 
         return 'test';
+    }
+
+    /**
+     * Output test results in JSON format for CI/CD integration.
+     *
+     * @param  int         $exitCode  Test execution exit code
+     * @param  string      $task      Test task that was run
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  string|null $filter    Test name filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputJsonResults(
+        int $exitCode,
+        string $task,
+        ?string $workspace,
+        ?string $filter,
+        float $duration
+    ): int {
+        $data = [
+            'status' => $exitCode === 0 ? 'success' : 'failure',
+            'task' => $task,
+            'exitCode' => $exitCode,
+            'duration' => $duration,
+            'timestamp' => date('c'),
+        ];
+
+        if ($workspace !== null && $workspace !== '') {
+            $data['workspace'] = $workspace;
+        }
+
+        if ($filter !== null && $filter !== '') {
+            $data['filter'] = $filter;
+        }
+
+        $this->outputJson($data);
+
+        return $exitCode;
+    }
+
+    /**
+     * Output test results in table format.
+     *
+     * @param  int         $exitCode  Test execution exit code
+     * @param  string      $task      Test task that was run
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputTableResults(
+        int $exitCode,
+        string $task,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $this->line('');
+        $this->line('Test Summary');
+        $this->line('');
+
+        $rows = [
+            ['Task', $task],
+            ['Status', $exitCode === 0 ? '✓ Passed' : '✗ Failed'],
+            ['Duration', $duration . 's'],
+        ];
+
+        $rows[] = $workspace !== null && $workspace !== '' ? ['Workspace', $workspace] : ['Workspace', 'All'];
+
+        $this->table(['Property', 'Value'], $rows);
+
+        return $exitCode;
+    }
+
+    /**
+     * Output test results in summary format.
+     *
+     * @param  int         $exitCode  Test execution exit code
+     * @param  string      $task      Test task that was run
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputSummaryResults(
+        int $exitCode,
+        string $task,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $status = $exitCode === 0 ? '✓ PASSED' : '✗ FAILED';
+        $workspaceInfo = $workspace !== null && $workspace !== '' ? " ({$workspace})" : ' (all workspaces)';
+
+        $this->line("{$status}: {$task}{$workspaceInfo} in {$duration}s");
+
+        return $exitCode;
     }
 }

@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Utility;
 
-use function count;
+use function date;
 use function extension_loaded;
+use function json_encode;
 
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\Process;
 
@@ -19,77 +21,60 @@ use function trim;
 use function version_compare;
 
 /**
- * Doctor Command.
+ * System Doctor Command.
  *
- * This command performs comprehensive system health checks to verify that all
- * required tools and dependencies are properly installed and configured for
- * working with the monorepo. It acts as a diagnostic tool to help developers
- * quickly identify missing dependencies or configuration issues.
+ * This command performs comprehensive health checks on the development environment
+ * to ensure all required tools and dependencies are properly installed and configured.
+ * It validates PHP version, extensions, package managers, build tools, and workspace
+ * configuration.
  *
- * The doctor command validates:
- * 1. PHP installation and version requirements
- * 2. Required PHP extensions (json, mbstring, xml)
- * 3. Composer installation and version
- * 4. Turborepo installation and version
- * 5. Node.js installation and version
- * 6. pnpm package manager installation
- * 7. Workspace configuration and discovery
+ * The doctor command is essential for:
+ * - Onboarding new developers (verify environment setup)
+ * - Troubleshooting build/deployment issues
+ * - CI/CD pipeline validation
+ * - Pre-deployment health checks
+ * - System requirement verification
  *
- * Health check process:
- * - Runs each check independently
- * - Reports success (✓) or failure (✗) for each check
- * - Provides version information for installed tools
- * - Suggests installation commands for missing tools
- * - Displays workspace statistics if configured correctly
- * - Returns overall pass/fail status
+ * Health checks performed:
+ * 1. PHP version and required extensions (json, mbstring, xml)
+ * 2. Composer installation and version
+ * 3. Turborepo installation and version
+ * 4. Node.js installation and version
+ * 5. pnpm installation and version
+ * 6. Workspace discovery and validation
  *
- * Requirements checked:
- * - PHP >= 8.2.0
- * - PHP extensions: json, mbstring, xml
- * - Composer (any recent version)
- * - Turbo (for monorepo task orchestration)
- * - Node.js (for JavaScript tooling)
- * - pnpm (workspace package manager)
- * - Valid pnpm-workspace.yaml configuration
+ * Output formats:
+ * - Default: Detailed output with colored status indicators
+ * - Table: Structured table format for easy scanning
+ * - JSON: Machine-readable format for CI/CD integration
+ * - Quiet: Only show failures (useful for scripts)
  *
- * Features:
- * - Comprehensive system validation
- * - Clear pass/fail indicators
- * - Version information display
- * - Installation suggestions for missing tools
- * - Workspace statistics (apps and packages count)
- * - Organized output with sections
- * - Overall health status summary
- * - Exit code indicates success/failure
+ * Exit codes:
+ * - 0: All checks passed (system healthy)
+ * - 1: One or more checks failed (action required)
  *
- * Example usage:
+ * Examples:
  * ```bash
- * # Run all health checks
- * hive doctor
+ * # Run all health checks with detailed output
+ * php bin/cli system:doctor
  *
- * # Using aliases
- * hive check
- * hive health
+ * # Display results in table format
+ * php bin/cli doctor --table
+ *
+ * # Output as JSON for CI/CD
+ * php bin/cli doctor --json
+ *
+ * # Quiet mode (only show failures)
+ * php bin/cli doctor --quiet
  * ```
  *
- * Example output:
- * ```
- * Checking PHP...
- *   ✓ PHP version: 8.2.0
- *   ✓ Extension: json
- *   ✓ Extension: mbstring
- *
- * Checking Composer...
- *   ✓ Composer version: 2.6.5
- *
- * Checking Turbo...
- *   ✗ Turbo not found
- *   Install: npm install -g turbo
+ * CI/CD Integration:
+ * ```yaml
+ * - name: Check system health
+ *   run: php bin/cli doctor --json > health-report.json
  * ```
  *
- * @see BaseCommand For inherited functionality
- * @see InteractsWithMonorepo For workspace discovery
- * @see VersionCommand For detailed version information
+ * @see BaseCommand For base command functionality
  */
 #[AsCommand(
     name: 'system:doctor',
@@ -99,275 +84,632 @@ use function version_compare;
 final class DoctorCommand extends BaseCommand
 {
     /**
+     * Array to store check results for table/JSON output.
+     *
+     * Each result contains:
+     * - component: Name of the component being checked
+     * - status: Pass/Fail indicator
+     * - details: Additional information about the check
+     * - severity: critical, warning, or info
+     * - passed: Boolean indicating if check passed
+     *
+     * @var array<array{component: string, status: string, details: string, severity: string, passed: bool}>
+     */
+    private array $checkResults = [];
+
+    /**
      * Configure the command options.
      *
-     * Common options (workspace, force, no-cache, no-interaction) are inherited from BaseCommand.
+     * Defines command-line options for controlling output format and verbosity.
+     *
+     * Options:
+     * - --table (-t): Display results in structured table format
+     * - --json (-j): Output as JSON for CI/CD integration
+     * - --quiet (-q): Only show failures (suppress success messages)
+     *
+     * Note: --json and --table are mutually exclusive
      */
     #[Override]
     protected function configure(): void
     {
         parent::configure();
+
+        $this
+            ->addOption('table', 't', InputOption::VALUE_NONE, 'Display results in table format')
+            ->addOption('json', 'j', InputOption::VALUE_NONE, 'Output as JSON for CI/CD integration')
+            ->addOption('quiet', 'q', InputOption::VALUE_NONE, 'Only show failures (quiet mode)');
     }
 
     /**
-     * Execute the doctor command.
+     * Execute the system health check command.
      *
-     * This method orchestrates all health checks in sequence:
-     * 1. Displays intro banner
-     * 2. Checks PHP version and extensions
-     * 3. Checks Composer installation
-     * 4. Checks Turbo installation
-     * 5. Checks Node.js installation
-     * 6. Checks pnpm installation
-     * 7. Checks workspace configuration
-     * 8. Reports overall health status
+     * Performs comprehensive health checks on the development environment
+     * and displays results in the requested format.
      *
-     * Each check is independent and reports its own status. The command
-     * tracks overall success and returns appropriate exit code.
+     * Execution flow:
+     * 1. Validate option combinations (--json and --table are exclusive)
+     * 2. Display intro message (unless JSON or quiet mode)
+     * 3. Run all health checks sequentially:
+     *    - PHP version and extensions
+     *    - Composer installation
+     *    - Turborepo installation
+     *    - Node.js installation
+     *    - pnpm installation
+     *    - Workspace discovery
+     * 4. Display results in requested format
+     * 5. Show summary message
+     * 6. Return appropriate exit code
      *
-     * @param  InputInterface  $input  Command input (arguments and options)
-     * @param  OutputInterface $output Command output (for displaying messages)
-     * @return int             Exit code (0 if all checks pass, 1 if any check fails)
+     * @param  InputInterface  $input  Command input interface
+     * @param  OutputInterface $output Command output interface
+     * @return int             Exit code (SUCCESS if all checks passed, FAILURE otherwise)
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        // Display intro banner
-        $this->intro('Running system health checks...');
-        $this->line('');
+        // Parse output format options
+        $useTable = $this->hasOption('table');
+        $useJson = $this->hasOption('json');
+        $quietMode = $this->hasOption('quiet');
+
+        // Validate option combinations
+        if ($useJson && $useTable) {
+            $this->error('Cannot use --json and --table together');
+
+            return Command::FAILURE;
+        }
+
+        // Display intro message (unless JSON or quiet mode)
+        if (! $useJson && ! $quietMode) {
+            $this->intro('Running system health checks...');
+        }
+
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
         // Track overall health status
-        // All checks must pass for overall success
         $allPassed = true;
 
-        // Check PHP version and required extensions
-        // Validates PHP >= 8.2.0 and json, mbstring, xml extensions
-        if (! $this->checkPhp()) {
-            $allPassed = false;
-        }
-        $this->line('');
+        // =====================================================================
+        // RUN HEALTH CHECKS
+        // =====================================================================
 
-        // Check Composer installation and version
-        // Validates composer command is available
-        if (! $this->checkComposer()) {
+        // Check PHP version and extensions
+        if (! $this->checkPhp($useTable, $quietMode)) {
             $allPassed = false;
         }
-        $this->line('');
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
-        // Check Turbo installation and version
-        // Validates turbo command is available for monorepo orchestration
-        if (! $this->checkTurbo()) {
+        // Check Composer installation
+        if (! $this->checkComposer($useTable, $quietMode)) {
             $allPassed = false;
         }
-        $this->line('');
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
-        // Check Node.js installation and version
-        // Validates node command is available for JavaScript tooling
-        if (! $this->checkNode()) {
+        // Check Turborepo installation
+        if (! $this->checkTurbo($useTable, $quietMode)) {
             $allPassed = false;
         }
-        $this->line('');
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
-        // Check pnpm installation and version
-        // Validates pnpm command is available for workspace management
-        if (! $this->checkPnpm()) {
+        // Check Node.js installation
+        if (! $this->checkNode($useTable, $quietMode)) {
             $allPassed = false;
         }
-        $this->line('');
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
+
+        // Check pnpm installation
+        if (! $this->checkPnpm($useTable, $quietMode)) {
+            $allPassed = false;
+        }
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
         // Check workspace configuration
-        // Validates pnpm-workspace.yaml and discovers workspaces
-        if (! $this->checkWorkspaces()) {
+        if (! $this->checkWorkspaces($useTable, $quietMode)) {
             $allPassed = false;
         }
-        $this->line('');
+        if (! $useTable && ! $useJson && ! $quietMode) {
+            $this->line('');
+        }
 
-        // Report overall health status
-        if ($allPassed) {
-            // All checks passed - system is healthy
-            $this->outro('✓ All checks passed! System is healthy.');
+        // =====================================================================
+        // DISPLAY RESULTS
+        // =====================================================================
 
+        // JSON output for CI/CD
+        if ($useJson) {
+            return $this->displayJson($allPassed);
+        }
+
+        // Table output for structured view
+        if ($useTable) {
+            $this->displayTable();
+        }
+
+        // Quiet mode: only return exit code if all passed
+        if ($quietMode && $allPassed) {
             return Command::SUCCESS;
         }
 
-        // One or more checks failed - system needs attention
-        $this->error('✗ Some checks failed. Please fix the issues above.');
+        // Display summary message
+        if (! $quietMode) {
+            if ($allPassed) {
+                $this->outro('✓ All checks passed! System is healthy.');
+            } else {
+                $this->error('✗ Some checks failed. Please fix the issues above.');
+            }
+        }
 
-        return Command::FAILURE;
+        return $allPassed ? Command::SUCCESS : Command::FAILURE;
     }
 
     /**
-     * Check PHP version and extensions.
+     * Check PHP version and required extensions.
      *
-     * Validates that PHP version is >= 8.2.0 and that required extensions
-     * (json, mbstring, xml) are loaded.
+     * Validates that PHP meets minimum version requirements and that all
+     * required extensions are loaded. This is critical for CLI functionality.
      *
-     * @return bool True if all PHP checks pass, false otherwise
+     * Checks performed:
+     * - PHP version >= 8.2.0 (minimum required)
+     * - json extension (for JSON parsing)
+     * - mbstring extension (for multibyte string handling)
+     * - xml extension (for XML parsing)
+     *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
+     * @return bool True if all PHP checks passed, false otherwise
      */
-    private function checkPhp(): bool
+    private function checkPhp(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking PHP...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking PHP...');
+        }
 
+        // Check PHP version
         $version = PHP_VERSION;
         $required = '8.2.0';
+        $passed = version_compare($version, $required, '>=');
 
-        if (version_compare($version, $required, '>=')) {
-            $this->line("  ✓ PHP version: {$version}");
+        if ($useTable) {
+            $this->checkResults[] = [
+                'component' => 'PHP',
+                'status' => $passed ? '✓ Pass' : '✗ Fail',
+                'details' => $passed ? "Version: {$version}" : "Version: {$version} (required: >= {$required})",
+                'severity' => $passed ? 'info' : 'critical',
+                'passed' => $passed,
+            ];
+        } elseif ($passed) {
+            if (! $quietMode) {
+                $this->line("  ✓ PHP version: {$version}");
+            }
         } else {
             $this->line("  ✗ PHP version: {$version} (required: >= {$required})");
 
             return false;
         }
 
-        // Check required extensions
+        // Check required PHP extensions
         $requiredExtensions = ['json', 'mbstring', 'xml'];
         $allExtensionsLoaded = true;
 
         foreach ($requiredExtensions as $requiredExtension) {
-            if (extension_loaded($requiredExtension)) {
-                $this->line("  ✓ Extension: {$requiredExtension}");
+            $loaded = extension_loaded($requiredExtension);
+
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => "- {$requiredExtension}",
+                    'status' => $loaded ? '✓ Pass' : '✗ Fail',
+                    'details' => $loaded ? 'Extension loaded' : 'Extension missing',
+                    'severity' => $loaded ? 'info' : 'critical',
+                    'passed' => $loaded,
+                ];
+            } elseif ($loaded) {
+                if (! $quietMode) {
+                    $this->line("  ✓ Extension: {$requiredExtension}");
+                }
             } else {
                 $this->line("  ✗ Extension: {$requiredExtension} (missing)");
                 $allExtensionsLoaded = false;
             }
+
+            if (! $loaded) {
+                $allExtensionsLoaded = false;
+            }
         }
 
-        return $allExtensionsLoaded;
+        return $passed && $allExtensionsLoaded;
     }
 
     /**
-     * Check Composer installation.
+     * Check Composer installation and version.
      *
-     * Validates that Composer is installed and accessible via the
-     * hasComposer() method from BaseCommand.
+     * Validates that Composer is installed and accessible. Composer is
+     * required for PHP dependency management in the monorepo.
      *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
      * @return bool True if Composer is installed, false otherwise
      */
-    private function checkComposer(): bool
+    private function checkComposer(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking Composer...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking Composer...');
+        }
 
         if (! $this->hasComposer()) {
-            $this->line('  ✗ Composer not found');
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => 'Composer',
+                    'status' => '✗ Fail',
+                    'details' => 'Not found',
+                    'severity' => 'critical',
+                    'passed' => false,
+                ];
+            } else {
+                $this->line('  ✗ Composer not found');
+            }
 
             return false;
         }
 
         $version = $this->getComposerVersion();
-        $this->line("  ✓ Composer version: {$version}");
+
+        if ($useTable) {
+            $this->checkResults[] = [
+                'component' => 'Composer',
+                'status' => '✓ Pass',
+                'details' => "Version: {$version}",
+                'severity' => 'info',
+                'passed' => true,
+            ];
+        } elseif (! $quietMode) {
+            $this->line("  ✓ Composer version: {$version}");
+        }
 
         return true;
     }
 
     /**
-     * Check Turbo installation.
+     * Check Turborepo installation and version.
      *
-     * Validates that Turborepo is installed globally and accessible.
-     * Provides installation instructions if not found.
+     * Validates that Turborepo is installed globally. Turborepo is the
+     * build system used for managing monorepo tasks and caching.
      *
-     * @return bool True if Turbo is installed, false otherwise
+     * Installation: npm install -g turbo
+     *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
+     * @return bool True if Turborepo is installed, false otherwise
      */
-    private function checkTurbo(): bool
+    private function checkTurbo(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking Turbo...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking Turbo...');
+        }
 
         $process = Process::fromShellCommandline('turbo --version');
         $process->run();
 
         if (! $process->isSuccessful()) {
-            $this->line('  ✗ Turbo not found');
-            $this->comment('  Install: npm install -g turbo');
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => 'Turbo',
+                    'status' => '✗ Fail',
+                    'details' => 'Not found (npm install -g turbo)',
+                    'severity' => 'warning',
+                    'passed' => false,
+                ];
+            } else {
+                $this->line('  ✗ Turbo not found');
+                if (! $quietMode) {
+                    $this->comment('  Install: npm install -g turbo');
+                }
+            }
 
             return false;
         }
 
         $version = trim($process->getOutput());
-        $this->line("  ✓ Turbo version: {$version}");
+
+        if ($useTable) {
+            $this->checkResults[] = [
+                'component' => 'Turbo',
+                'status' => '✓ Pass',
+                'details' => "Version: {$version}",
+                'severity' => 'info',
+                'passed' => true,
+            ];
+        } elseif (! $quietMode) {
+            $this->line("  ✓ Turbo version: {$version}");
+        }
 
         return true;
     }
 
     /**
-     * Check Node.js installation.
+     * Check Node.js installation and version.
      *
-     * Validates that Node.js is installed and accessible via the
-     * node command.
+     * Validates that Node.js is installed. Node.js is required for
+     * JavaScript/TypeScript tooling and frontend build processes.
      *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
      * @return bool True if Node.js is installed, false otherwise
      */
-    private function checkNode(): bool
+    private function checkNode(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking Node.js...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking Node.js...');
+        }
 
         $process = Process::fromShellCommandline('node --version');
         $process->run();
 
         if (! $process->isSuccessful()) {
-            $this->line('  ✗ Node.js not found');
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => 'Node.js',
+                    'status' => '✗ Fail',
+                    'details' => 'Not found',
+                    'severity' => 'warning',
+                    'passed' => false,
+                ];
+            } else {
+                $this->line('  ✗ Node.js not found');
+            }
 
             return false;
         }
 
         $version = trim($process->getOutput());
-        $this->line("  ✓ Node.js version: {$version}");
+
+        if ($useTable) {
+            $this->checkResults[] = [
+                'component' => 'Node.js',
+                'status' => '✓ Pass',
+                'details' => "Version: {$version}",
+                'severity' => 'info',
+                'passed' => true,
+            ];
+        } elseif (! $quietMode) {
+            $this->line("  ✓ Node.js version: {$version}");
+        }
 
         return true;
     }
 
     /**
-     * Check pnpm installation.
+     * Check pnpm installation and version.
      *
-     * Validates that pnpm package manager is installed globally.
-     * Provides installation instructions if not found.
+     * Validates that pnpm is installed globally. pnpm is the package
+     * manager used for managing JavaScript dependencies in the monorepo.
      *
+     * Installation: npm install -g pnpm
+     *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
      * @return bool True if pnpm is installed, false otherwise
      */
-    private function checkPnpm(): bool
+    private function checkPnpm(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking pnpm...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking pnpm...');
+        }
 
         $process = Process::fromShellCommandline('pnpm --version');
         $process->run();
 
         if (! $process->isSuccessful()) {
-            $this->line('  ✗ pnpm not found');
-            $this->comment('  Install: npm install -g pnpm');
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => 'pnpm',
+                    'status' => '✗ Fail',
+                    'details' => 'Not found (npm install -g pnpm)',
+                    'severity' => 'warning',
+                    'passed' => false,
+                ];
+            } else {
+                $this->line('  ✗ pnpm not found');
+                if (! $quietMode) {
+                    $this->comment('  Install: npm install -g pnpm');
+                }
+            }
 
             return false;
         }
 
         $version = trim($process->getOutput());
-        $this->line("  ✓ pnpm version: {$version}");
+
+        if ($useTable) {
+            $this->checkResults[] = [
+                'component' => 'pnpm',
+                'status' => '✓ Pass',
+                'details' => "Version: {$version}",
+                'severity' => 'info',
+                'passed' => true,
+            ];
+        } elseif (! $quietMode) {
+            $this->line("  ✓ pnpm version: {$version}");
+        }
 
         return true;
     }
 
     /**
-     * Check workspace configuration.
+     * Check workspace configuration and discovery.
      *
-     * Validates that pnpm-workspace.yaml exists and workspaces can be
-     * discovered. Displays statistics about apps and packages found.
+     * Validates that workspaces are properly configured and can be discovered.
+     * Displays counts of apps and packages found in the monorepo.
      *
-     * @return bool True if workspaces are configured correctly, false otherwise
+     * This check ensures:
+     * - pnpm-workspace.yaml is properly configured
+     * - Workspaces can be discovered
+     * - Apps and packages are correctly categorized
+     *
+     * @param  bool $useTable  Whether to store results for table output
+     * @param  bool $quietMode Whether to suppress success messages
+     * @return bool True if workspaces are found, false otherwise
      */
-    private function checkWorkspaces(): bool
+    private function checkWorkspaces(bool $useTable, bool $quietMode): bool
     {
-        $this->info('Checking workspaces...');
+        if (! $useTable && ! $quietMode) {
+            $this->info('Checking workspaces...');
+        }
 
         $workspaces = $this->getWorkspaces();
 
-        if ($workspaces === []) {
-            $this->line('  ✗ No workspaces found');
+        if ($workspaces->isEmpty()) {
+            if ($useTable) {
+                $this->checkResults[] = [
+                    'component' => 'Workspaces',
+                    'status' => '✗ Fail',
+                    'details' => 'No workspaces found',
+                    'severity' => 'critical',
+                    'passed' => false,
+                ];
+            } else {
+                $this->line('  ✗ No workspaces found');
+            }
 
             return false;
         }
 
         $apps = $this->getApps();
         $packages = $this->getPackages();
+        $workspaceCount = $workspaces->count();
+        $appCount = $apps->count();
+        $packageCount = $packages->count();
 
-        $this->line('  ✓ Found ' . count($workspaces) . ' workspace(s)');
-        $this->line('    - Apps: ' . count($apps));
-        $this->line('    - Packages: ' . count($packages));
+        if ($useTable) {
+            $details = "{$workspaceCount} workspace(s) ({$appCount} app(s), {$packageCount} package(s))";
+            $this->checkResults[] = [
+                'component' => 'Workspaces',
+                'status' => '✓ Pass',
+                'details' => $details,
+                'severity' => 'info',
+                'passed' => true,
+            ];
+        } elseif (! $quietMode) {
+            $this->line("  ✓ Found {$workspaceCount} workspace(s)");
+            $this->line("    - Apps: {$appCount}");
+            $this->line("    - Packages: {$packageCount}");
+        }
 
         return true;
+    }
+
+    /**
+     * Display check results in table format.
+     *
+     * Renders all health check results in a structured table with columns:
+     * - Component: Name of the component checked
+     * - Status: Pass/Fail indicator
+     * - Severity: critical, warning, or info
+     * - Details: Additional information about the check
+     *
+     * This format is useful for:
+     * - Quick scanning of results
+     * - Identifying failures at a glance
+     * - Understanding severity levels
+     */
+    private function displayTable(): void
+    {
+        $this->line('');
+
+        $headers = ['Component', 'Status', 'Severity', 'Details'];
+        $rows = [];
+
+        foreach ($this->checkResults as $checkResult) {
+            $rows[] = [
+                $checkResult['component'],
+                $checkResult['status'],
+                $checkResult['severity'],
+                $checkResult['details'],
+            ];
+        }
+
+        $this->table($headers, $rows);
+        $this->line('');
+    }
+
+    /**
+     * Display check results in JSON format.
+     *
+     * Outputs health check results as JSON for CI/CD integration and
+     * automated processing. The JSON structure includes:
+     * - status: Overall health status (healthy/unhealthy)
+     * - summary: Aggregated statistics
+     * - checks: Detailed results for each check
+     * - timestamp: ISO 8601 timestamp
+     *
+     * JSON structure:
+     * ```json
+     * {
+     *   "status": "healthy",
+     *   "summary": {
+     *     "total": 10,
+     *     "passed": 10,
+     *     "failed": 0,
+     *     "critical": 0,
+     *     "warning": 0,
+     *     "info": 10
+     *   },
+     *   "checks": [...],
+     *   "timestamp": "2026-02-12T10:30:00+00:00"
+     * }
+     * ```
+     *
+     * @param  bool $allPassed Whether all checks passed
+     * @return int  Exit code (SUCCESS if all passed, FAILURE otherwise)
+     */
+    private function displayJson(bool $allPassed): int
+    {
+        $checks = [];
+        $summary = [
+            'total' => 0,
+            'passed' => 0,
+            'failed' => 0,
+            'critical' => 0,
+            'warning' => 0,
+            'info' => 0,
+        ];
+
+        foreach ($this->checkResults as $checkResult) {
+            $checks[] = [
+                'component' => $checkResult['component'],
+                'passed' => $checkResult['passed'],
+                'severity' => $checkResult['severity'],
+                'details' => $checkResult['details'],
+            ];
+
+            $summary['total']++;
+            if ($checkResult['passed']) {
+                $summary['passed']++;
+            } else {
+                $summary['failed']++;
+            }
+            $summary[$checkResult['severity']]++;
+        }
+
+        $output = [
+            'status' => $allPassed ? 'healthy' : 'unhealthy',
+            'summary' => $summary,
+            'checks' => $checks,
+            'timestamp' => date('c'),
+        ];
+
+        $this->line(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        return $allPassed ? Command::SUCCESS : Command::FAILURE;
     }
 }

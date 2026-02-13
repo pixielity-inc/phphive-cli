@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Lifecycle;
 
-use function count;
-
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -140,7 +138,7 @@ final class CleanCommand extends BaseCommand
         } else {
             // Cleaning all workspaces
             $workspaces = $this->getWorkspaces();
-            $this->info('Cleaning ' . count($workspaces) . ' workspace(s)');
+            $this->info('Cleaning ' . $workspaces->count() . ' workspace(s)');
         }
 
         // Build Turbo options array

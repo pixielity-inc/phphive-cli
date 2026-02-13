@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Lifecycle;
 
-use function count;
-
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -136,7 +134,7 @@ final class InstallCommand extends BaseCommand
         } else {
             // Installing all workspaces
             $workspaces = $this->getWorkspaces();
-            $this->info('Installing dependencies for ' . count($workspaces) . ' workspace(s)');
+            $this->info('Installing dependencies for ' . $workspaces->count() . ' workspace(s)');
         }
 
         // Build Turbo options array

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Quality;
 
-use function is_dir;
-
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -144,7 +142,7 @@ final class RefactorCommand extends BaseCommand
             $cacheDir = $root . '/.rector.cache';
 
             // Remove cache directory if it exists
-            if (is_dir($cacheDir)) {
+            if ($this->filesystem()->isDirectory($cacheDir)) {
                 $process = Process::fromShellCommandline("rm -rf {$cacheDir}");
                 $process->run();
             }

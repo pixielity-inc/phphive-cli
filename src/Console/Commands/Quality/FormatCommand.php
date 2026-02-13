@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Quality;
 
-use function count;
-
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use Symfony\Component\Console\Application;
@@ -76,12 +74,25 @@ final class FormatCommand extends BaseCommand
     {
         parent::configure();
 
-        $this->addOption(
-            'check',
-            null,
-            InputOption::VALUE_NONE,
-            'Check only without fixing (delegates to lint command)',
-        );
+        $this
+            ->addOption(
+                'check',
+                null,
+                InputOption::VALUE_NONE,
+                'Check only without fixing (delegates to lint command)',
+            )
+            ->addOption(
+                'json',
+                'j',
+                InputOption::VALUE_NONE,
+                'Output results as JSON (for CI/CD integration)',
+            )
+            ->addOption(
+                'table',
+                null,
+                InputOption::VALUE_NONE,
+                'Display changes summary in table format',
+            );
     }
 
     /**
@@ -102,15 +113,27 @@ final class FormatCommand extends BaseCommand
         // Extract options from user input
         $workspace = $this->option('workspace');
         $check = $this->hasOption('check');
+        $jsonMode = $this->hasOption('json');
+        $tableMode = $this->hasOption('table');
 
         // If check is requested, delegate to lint command
         // This provides a convenient shortcut: format --check = lint
         if ($check) {
-            $this->info('Check mode enabled, running lint command...');
+            if (! $jsonMode) {
+                $this->info('Check mode enabled, running lint command...');
+            }
 
             $application = $this->getApplication();
             if (! $application instanceof Application) {
-                $this->error('Application not available');
+                if ($jsonMode) {
+                    $this->outputJson([
+                        'status' => 'error',
+                        'message' => 'Application not available',
+                        'timestamp' => date('c'),
+                    ]);
+                } else {
+                    $this->error('Application not available');
+                }
 
                 return Command::FAILURE;
             }
@@ -118,17 +141,18 @@ final class FormatCommand extends BaseCommand
             return $application->find('lint')->run($input, $output);
         }
 
-        // Display intro banner
-        $this->intro('Fixing Code Style');
-
+        // Display intro banner (skip in JSON mode)
         // Show what we're formatting
-        if (is_string($workspace) && $workspace !== '') {
-            // Formatting specific workspace
-            $this->info("Formatting workspace: {$workspace}");
-        } else {
-            // Formatting all workspaces
-            $workspaces = $this->getWorkspaces();
-            $this->info('Formatting ' . count($workspaces) . ' workspace(s)');
+        if (! $jsonMode) {
+            $this->intro('Fixing Code Style');
+            if (is_string($workspace) && $workspace !== '') {
+                // Formatting specific workspace
+                $this->info("Formatting workspace: {$workspace}");
+            } else {
+                // Formatting all workspaces
+                $workspaces = $this->getWorkspaces();
+                $this->info('Formatting ' . $workspaces->count() . ' workspace(s)');
+            }
         }
 
         // Build Turbo options array
@@ -139,11 +163,27 @@ final class FormatCommand extends BaseCommand
             $options['filter'] = $workspace;
         }
 
+        // Capture start time for metrics
+        $startTime = microtime(true);
+
         // Run the format task via Turbo
         // Each workspace runs: vendor/bin/pint (without --test flag)
         // Pint will automatically fix style issues and modify files
         $exitCode = $this->turboRun('format', $options);
 
+        // Calculate duration
+        $duration = round(microtime(true) - $startTime, 2);
+
+        // Handle different output modes
+        if ($jsonMode) {
+            return $this->outputJsonResults($exitCode, $workspace, $duration);
+        }
+
+        if ($tableMode) {
+            return $this->outputTableResults($exitCode, $workspace, $duration);
+        }
+
+        // Default output mode
         // Report results to user
         if ($exitCode === 0) {
             // Success - all files formatted
@@ -156,5 +196,73 @@ final class FormatCommand extends BaseCommand
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Output format results in JSON format for CI/CD integration.
+     *
+     * @param  int         $exitCode  Format execution exit code
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputJsonResults(
+        int $exitCode,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $data = [
+            'status' => $exitCode === 0 ? 'success' : 'failure',
+            'task' => 'format',
+            'exitCode' => $exitCode,
+            'duration' => $duration,
+            'timestamp' => date('c'),
+        ];
+
+        if ($workspace !== null && is_string($workspace) && $workspace !== '') {
+            $data['workspace'] = $workspace;
+        }
+
+        if ($exitCode !== 0) {
+            $data['message'] = 'Format failed';
+        }
+
+        $this->outputJson($data);
+
+        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    /**
+     * Output format results in table format.
+     *
+     * @param  int         $exitCode  Format execution exit code
+     * @param  string|null $workspace Workspace filter (if any)
+     * @param  float       $duration  Execution duration in seconds
+     * @return int         Exit code to return
+     */
+    private function outputTableResults(
+        int $exitCode,
+        ?string $workspace,
+        float $duration
+    ): int {
+        $this->line('');
+        $this->line('Format Summary');
+        $this->line('');
+
+        $rows = [
+            ['Task', 'format'],
+            ['Status', $exitCode === 0 ? '✓ Success' : '✗ Failed'],
+            ['Duration', $duration . 's'],
+        ];
+
+        if ($workspace !== null && is_string($workspace) && $workspace !== '') {
+            $rows[] = ['Workspace', $workspace];
+        } else {
+            $rows[] = ['Workspace', 'All'];
+        }
+
+        $this->table(['Property', 'Value'], $rows);
+
+        return $exitCode === 0 ? Command::SUCCESS : Command::FAILURE;
     }
 }
