@@ -15,10 +15,14 @@ use PhpHive\Cli\Concerns\InteractsWithComposer;
 use PhpHive\Cli\Concerns\InteractsWithMonorepo;
 use PhpHive\Cli\Concerns\InteractsWithPrompts;
 use PhpHive\Cli\Concerns\InteractsWithTurborepo;
+use PhpHive\Cli\Factories\AppTypeFactory;
+use PhpHive\Cli\Factories\PackageTypeFactory;
+use PhpHive\Cli\Services\NameSuggestionService;
 use PhpHive\Cli\Support\Composer;
 use PhpHive\Cli\Support\Container;
 use PhpHive\Cli\Support\Docker;
 use PhpHive\Cli\Support\Filesystem;
+use PhpHive\Cli\Support\PreflightChecker;
 use PhpHive\Cli\Support\Process;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
@@ -249,6 +253,97 @@ abstract class BaseCommand extends Command
     }
 
     /**
+     * Get the PreflightChecker service instance.
+     *
+     * Returns the PreflightChecker service for validating the development
+     * environment before executing commands. The service checks for:
+     * - Required system dependencies (PHP, Composer, Node.js, etc.)
+     * - Correct versions of tools
+     * - Proper configuration
+     * - Available disk space
+     *
+     * Example usage:
+     * ```php
+     * $checker = $this->preflightChecker();
+     * if (!$checker->checkDocker()) {
+     *     $this->error('Docker is not available');
+     *     return Command::FAILURE;
+     * }
+     * ```
+     *
+     * @return PreflightChecker The PreflightChecker service instance
+     */
+    protected function preflightChecker(): PreflightChecker
+    {
+        return $this->container->make(PreflightChecker::class);
+    }
+
+    /**
+     * Get the PackageTypeFactory service instance.
+     *
+     * Returns the PackageTypeFactory for creating package type instances.
+     * Package types define how different types of packages (library, bundle,
+     * plugin, etc.) are scaffolded and configured.
+     *
+     * Example usage:
+     * ```php
+     * $factory = $this->packageTypeFactory();
+     * $packageType = $factory->create('library');
+     * $config = $packageType->collectConfiguration($input, $output);
+     * ```
+     *
+     * @return PackageTypeFactory The PackageTypeFactory service instance
+     */
+    protected function packageTypeFactory(): PackageTypeFactory
+    {
+        return $this->container->make(PackageTypeFactory::class);
+    }
+
+    /**
+     * Get the NameSuggestionService service instance.
+     *
+     * Returns the NameSuggestionService for generating alternative names
+     * when conflicts are detected. The service provides intelligent
+     * suggestions based on existing names in the workspace.
+     *
+     * Example usage:
+     * ```php
+     * $service = $this->nameSuggestionService();
+     * if ($this->filesystem()->exists($path)) {
+     *     $suggestion = $service->suggest($name, $existingNames);
+     *     $name = $this->text('Name already exists. Try', $suggestion);
+     * }
+     * ```
+     *
+     * @return NameSuggestionService The NameSuggestionService service instance
+     */
+    protected function nameSuggestionService(): NameSuggestionService
+    {
+        return $this->container->make(NameSuggestionService::class);
+    }
+
+    /**
+     * Get the AppTypeFactory service instance.
+     *
+     * Returns the AppTypeFactory for creating application type instances.
+     * App types define how different types of applications (Laravel, Symfony,
+     * Magento, etc.) are scaffolded and configured.
+     *
+     * Example usage:
+     * ```php
+     * $factory = $this->appTypeFactory();
+     * $appType = $factory->create('laravel');
+     * $config = $appType->collectConfiguration($input, $output);
+     * ```
+     *
+     * @return AppTypeFactory The AppTypeFactory service instance
+     */
+    protected function appTypeFactory(): AppTypeFactory
+    {
+        return $this->container->make(AppTypeFactory::class);
+    }
+
+    /**
      * Configure common options available to all commands.
      *
      * This method defines a set of standard options that are available across
@@ -345,6 +440,9 @@ abstract class BaseCommand extends Command
         // Store input and output for convenient access in command methods
         $this->input = $input;
         $this->output = $output;
+
+        // Set output for prompt methods
+        self::setOutput($output);
 
         // Call parent initialization to maintain Symfony Console behavior
         parent::initialize($input, $output);
