@@ -102,7 +102,7 @@ final class NameSuggestionService
 
         // Strategy 2: Hash-based suggestions (for uniqueness)
         for ($i = 0; $i < 3; $i++) {
-            $hash = substr(md5($name . time() . $i), 0, 3);
+            $hash = Str::substr(md5($name . time() . $i), 0, 3);
             $suggestion = "{$name}-{$hash}";
             if ($availabilityCheck($suggestion)) {
                 $suggestions[] = $suggestion;
@@ -159,7 +159,7 @@ final class NameSuggestionService
             $score = 0;
 
             // Prefer shorter names
-            $score -= strlen($suggestion);
+            $score -= Str::length($suggestion);
 
             // Prefer meaningful suffixes
             foreach (self::SUFFIXES as $suffix) {

@@ -400,8 +400,8 @@ final class ListCommand extends BaseCommand
      *
      * String operations:
      * - Str::startsWith(): Check if path begins with root (PHP 8.0+)
-     * - substr(): Remove root prefix from path
-     * - strlen(): Get length of root path for substr offset
+     * - Str::substr(): Remove root prefix from path
+     * - strlen(): Get length of root path for Str::substr offset
      * - +1 offset: Remove the trailing slash after root
      *
      * @param  Collection $workspaces Collection of workspace metadata arrays

@@ -9,10 +9,6 @@ use function count;
 use Illuminate\Support\Str;
 use Override;
 use PhpHive\Cli\Console\Commands\BaseCommand;
-
-use function strlen;
-use function substr;
-
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -270,8 +266,8 @@ final class InfoCommand extends BaseCommand
      *
      * String operations:
      * - Str::startWith(): Check if path begins with root (PHP 8.0+)
-     * - substr(): Remove root prefix from path
-     * - strlen(): Get length of root path for substr offset
+     * - Str::substr(): Remove root prefix from path
+     * - strlen(): Get length of root path for Str::substr offset
      * - +1 offset: Remove the trailing slash after root
      *
      * Path transformation:
@@ -295,7 +291,7 @@ final class InfoCommand extends BaseCommand
         if (Str::startsWith($workspace['path'], $root)) {
             // Strip root prefix and leading slash
             // Example: /home/user/project/apps/api -> apps/api
-            $workspace['path'] = substr($workspace['path'], strlen($root) + 1);
+            $workspace['path'] = Str::substr($workspace['path'], Str::length($root) + 1);
         }
 
         return $workspace;

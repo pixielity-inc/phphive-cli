@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli;
 
+use Illuminate\Support\Str;
+
 use function in_array;
 
 use Override;
@@ -331,7 +333,7 @@ final class Application extends BaseApplication
             }
 
             // Only suggest if distance is reasonable (less than half the command length)
-            if ($distance <= strlen($name) / 2) {
+            if ($distance <= Str::length($name) / 2) {
                 $alternatives[$allCommand] = $distance;
             }
         }

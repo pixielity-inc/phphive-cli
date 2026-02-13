@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpHive\Cli\Console\Commands\Make;
 
 use Exception;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Override;
 use PhpHive\Cli\Contracts\PackageTypeInterface;
@@ -15,9 +16,6 @@ use Pixielity\StubGenerator\Exceptions\StubNotFoundException;
 use Pixielity\StubGenerator\Facades\Stub;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-
-use function str_replace;
-
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -1124,7 +1122,7 @@ final class CreatePackageCommand extends BaseMakeCommand
         // Process each item (file or directory)
         foreach ($iterator as $item) {
             // Get relative path from stub directory
-            $relativePath = substr($item->getPathname(), strlen($stubPath) + 1);
+            $relativePath = Str::substr($item->getPathname(), Str::length($stubPath) + 1);
             $destinationPath = $packagePath . '/' . $relativePath;
 
             if ($item->isDir()) {
@@ -1133,42 +1131,42 @@ final class CreatePackageCommand extends BaseMakeCommand
             } else {
                 // Process file: remove .stub extension
                 $targetPath = $relativePath;
-                if (str_ends_with($targetPath, '.stub')) {
-                    $targetPath = substr($targetPath, 0, -5);
+                if (Str::endsWith($targetPath, '.stub')) {
+                    $targetPath = Str::substr($targetPath, 0, -5);
                 }
 
                 // Apply naming rules from package type
                 foreach ($namingRules as $pattern => $replacement) {
                     // Normalize paths for comparison (remove leading slashes)
-                    $normalizedPattern = ltrim($pattern, '/');
-                    $normalizedTarget = ltrim($targetPath, '/');
+                    $normalizedPattern = Str::ltrim($pattern, '/');
+                    $normalizedTarget = Str::ltrim($targetPath, '/');
 
                     // Check if this file matches the naming rule pattern
                     if ($normalizedTarget === $normalizedPattern) {
                         // Convert variable keys to {{UPPERCASE}} format for replacement
                         $replacementVars = [];
                         foreach ($variables as $key => $value) {
-                            $replacementVars['{{' . strtoupper($key) . '}}'] = $value;
+                            $replacementVars['{{' . Str::upper($key) . '}}'] = $value;
                         }
 
                         // Replace pattern with actual values from variables
-                        $replacedPattern = str_replace(array_keys($replacementVars), array_values($replacementVars), $replacement);
+                        $replacedPattern = Str::replace(array_keys($replacementVars), array_values($replacementVars), $replacement);
                         // Remove leading slash from replacement for consistency
-                        $targetPath = ltrim($replacedPattern, '/');
+                        $targetPath = Str::ltrim($replacedPattern, '/');
 
                         break;
                     }
                 }
 
                 // For JSON files, escape backslashes in namespace values
-                $isJsonFile = str_ends_with($targetPath, '.json');
+                $isJsonFile = Str::endsWith($targetPath, '.json');
                 $variablesToUse = $variables;
 
                 if ($isJsonFile && isset($variables[PackageTypeInterface::NAMESPACE])) {
                     // Escape single backslashes to double backslashes for JSON
                     // But don't double-escape already escaped backslashes
                     $namespace = $variables[PackageTypeInterface::NAMESPACE];
-                    $variablesToUse[PackageTypeInterface::NAMESPACE] = str_replace('\\', '\\\\', $namespace);
+                    $variablesToUse[PackageTypeInterface::NAMESPACE] = Str::replace('\\', '\\\\', $namespace);
                 }
 
                 // Display file being created in verbose mode

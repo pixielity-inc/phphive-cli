@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpHive\Cli\Console\Commands\Make;
 
 use Exception;
+use Illuminate\Support\Str;
 use Override;
 use PhpHive\Cli\Contracts\AppTypeInterface;
 use PhpHive\Cli\Enums\AppType;
@@ -14,9 +15,6 @@ use PhpHive\Cli\Services\NameSuggestionService;
 use PhpHive\Cli\Support\Filesystem;
 use Pixielity\StubGenerator\Exceptions\StubNotFoundException;
 use Pixielity\StubGenerator\Facades\Stub;
-
-use function str_replace;
-
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -1253,13 +1251,13 @@ final class CreateAppCommand extends BaseMakeCommand
         // Process each stub file
         foreach ($stubFiles as $stubFile) {
             // Get relative path from stub directory
-            $relativePath = str_replace($stubPath . '/', '', $stubFile);
+            $relativePath = Str::replace($stubPath . '/', '', $stubFile);
 
             // Check if this is an append stub
-            $isAppendStub = str_ends_with($relativePath, '.append.stub');
+            $isAppendStub = Str::endsWith($relativePath, '.append.stub');
 
             // Remove .stub or .append.stub extension for target file
-            $targetPath = $isAppendStub ? str_replace('.append.stub', '', $relativePath) : str_replace('.stub', '', $relativePath);
+            $targetPath = $isAppendStub ? Str::replace('.append.stub', '', $relativePath) : Str::replace('.stub', '', $relativePath);
 
             try {
                 // Handle append vs replace
@@ -1332,7 +1330,7 @@ final class CreateAppCommand extends BaseMakeCommand
                 $files = [...$files, ...$this->getStubFiles($path)];
             }
             // If it's a .stub file, add it to the list
-            elseif (str_ends_with($item, '.stub')) {
+            elseif (Str::endsWith($item, '.stub')) {
                 $files[] = $path;
             }
         }

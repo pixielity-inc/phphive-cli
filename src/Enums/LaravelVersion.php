@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Enums;
 
+use Illuminate\Support\Str;
+
 /**
  * Laravel Version Enumeration.
  *
@@ -161,7 +163,7 @@ enum LaravelVersion: string
     public static function fromString(string $version): ?self
     {
         // Strip 'v' prefix if present
-        $version = ltrim($version, 'v');
+        $version = Str::ltrim($version, 'v');
 
         return self::tryFrom($version);
     }
