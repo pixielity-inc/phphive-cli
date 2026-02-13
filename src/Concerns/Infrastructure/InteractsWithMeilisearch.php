@@ -133,8 +133,12 @@ trait InteractsWithMeilisearch
         // Generate a secure 32-character master key (16 bytes = 32 hex chars)
         $masterKey = bin2hex(random_bytes(16));
 
-        // Prompt for port number (default: 7700 - Meilisearch standard port)
-        $port = (int) $this->text('Meilisearch port', default: '7700', required: true);
+        // Prompt for port number with availability checking (default: 7700 - Meilisearch standard port)
+        $port = $this->promptForAvailablePort(
+            label: 'Meilisearch port',
+            defaultPort: 7700,
+            hint: 'Port will be checked for availability'
+        );
 
         // Display dashboard URL and master key for user reference
         $this->info("Dashboard: http://localhost:{$port} | Master key: {$masterKey}");

@@ -287,11 +287,19 @@ trait InteractsWithStorage
         // Generate secure 40-character secret key (20 bytes = 40 hex chars)
         $secretKey = bin2hex(random_bytes(20));
 
-        // Prompt for API port number (default: 9000 - MinIO standard port)
-        $port = (int) $this->text('MinIO API port', default: '9000', required: true);
+        // Prompt for API port number with availability checking (default: 9000 - MinIO standard port)
+        $port = $this->promptForAvailablePort(
+            label: 'MinIO API port',
+            defaultPort: 9000,
+            hint: 'Port will be checked for availability'
+        );
 
-        // Prompt for Console port number (default: 9001 - MinIO Console standard port)
-        $consolePort = (int) $this->text('MinIO Console port', default: '9001', required: true);
+        // Prompt for Console port number with availability checking (default: 9001 - MinIO Console standard port)
+        $consolePort = $this->promptForAvailablePort(
+            label: 'MinIO Console port',
+            defaultPort: 9001,
+            hint: 'Port will be checked for availability'
+        );
 
         // Sanitize app name for bucket naming (lowercase, replace special chars with hyphens)
         $defaultBucket = strtolower(preg_replace('/[^a-zA-Z0-9]/', '-', $appName) ?? $appName);

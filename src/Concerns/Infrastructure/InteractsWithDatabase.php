@@ -248,16 +248,14 @@ trait InteractsWithDatabase
         // Example: "My App!" becomes "my_app"
         $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $appName) ?? $appName);
 
-        // Prompt for database port (defaults to database type's standard port)
+        // Prompt for database port with availability checking
         // MySQL: 3306, PostgreSQL: 5432, MariaDB: 3306
-        $defaultPort = (string) ($dbTypeEnum->getDefaultPort() ?? 3306);
-        $portInput = $this->text(
+        $defaultPort = $dbTypeEnum->getDefaultPort() ?? 3306;
+        $port = $this->promptForAvailablePort(
             label: 'Database port',
-            default: $defaultPort,
-            required: true,
-            hint: 'Change if the default port is already in use'
+            defaultPort: $defaultPort,
+            hint: 'Port will be checked for availability'
         );
-        $port = (int) $portInput;
 
         // Prompt for database name (defaults to normalized app name)
         $dbName = $this->text(

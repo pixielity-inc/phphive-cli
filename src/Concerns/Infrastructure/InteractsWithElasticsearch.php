@@ -201,12 +201,18 @@ trait InteractsWithElasticsearch
         // Inform user that password was generated
         $this->info('Generated secure password for Elasticsearch');
 
+        // Prompt for port number with availability checking (default: 9200 - Elasticsearch standard port)
+        $port = $this->promptForAvailablePort(
+            label: 'Elasticsearch port',
+            defaultPort: 9200,
+            hint: 'Port will be checked for availability'
+        );
+
         // Create and return type-safe configuration object
-        // Note: Port 9200 is the standard Elasticsearch HTTP port
         return new SearchConfig(
             engine: SearchEngine::ELASTICSEARCH,
             host: 'localhost',
-            port: 9200,
+            port: $port,
             apiKey: $password,
             usingDocker: true
         );

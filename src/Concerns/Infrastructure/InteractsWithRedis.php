@@ -151,9 +151,12 @@ trait InteractsWithRedis
         // Generate a secure 32-character password (16 bytes = 32 hex chars)
         $password = bin2hex(random_bytes(16));
 
-        // Prompt for port number (default: 6379 - Redis standard port)
-        // In non-interactive mode, automatically uses default
-        $port = (int) $this->text('Redis port', '6379', '6379', true);
+        // Prompt for port number with availability checking (default: 6379 - Redis standard port)
+        $port = $this->promptForAvailablePort(
+            label: 'Redis port',
+            defaultPort: 6379,
+            hint: 'Port will be checked for availability'
+        );
 
         // Create type-safe configuration object for Docker setup
         $redisConfig = new RedisConfig('localhost', $port, $password, true);

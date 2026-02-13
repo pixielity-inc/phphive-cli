@@ -575,4 +575,101 @@ trait InteractsWithDocker
 
         return false;
     }
+
+    /**
+     * Check if a port is available (not in use).
+     *
+     * Attempts to create a socket connection to the specified port on localhost.
+     * If the connection fails, the port is considered available.
+     *
+     * @param  int  $port Port number to check
+     * @return bool True if port is available, false if in use
+     */
+    protected function isPortAvailable(int $port): bool
+    {
+        // Suppress errors and try to connect to the port
+        $connection = @fsockopen('127.0.0.1', $port, $errno, $errstr, 1);
+
+        if ($connection !== false) {
+            // Port is in use
+            fclose($connection);
+
+            return false;
+        }
+
+        // Port is available
+        return true;
+    }
+
+    /**
+     * Find the next available port starting from a given port.
+     *
+     * Checks ports sequentially starting from the specified port until
+     * an available port is found. Useful for suggesting alternative ports
+     * when the default port is already in use.
+     *
+     * @param  int $startPort   Port to start checking from
+     * @param  int $maxAttempts Maximum number of ports to check (default: 100)
+     * @return int Available port number, or original port if none found
+     */
+    protected function findAvailablePort(int $startPort, int $maxAttempts = 100): int
+    {
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            $port = $startPort + $i;
+            if ($this->isPortAvailable($port)) {
+                return $port;
+            }
+        }
+
+        // No available port found, return original
+        return $startPort;
+    }
+
+    /**
+     * Prompt for a port with availability checking.
+     *
+     * Prompts the user for a port number, checks if it's available, and
+     * suggests an alternative if it's in use. Continues prompting until
+     * an available port is selected.
+     *
+     * @param  string $label       Service name for the prompt label
+     * @param  int    $defaultPort Default port number
+     * @param  string $hint        Additional hint text (optional)
+     * @return int    Selected available port number
+     */
+    protected function promptForAvailablePort(string $label, int $defaultPort, string $hint = ''): int
+    {
+        // Check if default port is available
+        if (! $this->isPortAvailable($defaultPort)) {
+            // Find next available port
+            $suggestedPort = $this->findAvailablePort($defaultPort + 1);
+            $this->warning("Port {$defaultPort} is already in use");
+            $this->info("Suggested available port: {$suggestedPort}");
+            $defaultPort = $suggestedPort;
+        }
+
+        // Prompt for port
+        $fullHint = $hint !== '' ? $hint : 'Port must be available (not in use)';
+        $portInput = $this->text(
+            label: $label,
+            default: (string) $defaultPort,
+            required: true,
+            hint: $fullHint,
+            validate: function ($value) {
+                $port = (int) $value;
+                if ($port < 1 || $port > 65535) {
+                    return 'Port must be between 1 and 65535';
+                }
+                if (! $this->isPortAvailable($port)) {
+                    $suggested = $this->findAvailablePort($port + 1);
+
+                    return "Port {$port} is already in use. Try {$suggested}";
+                }
+
+                return null;
+            }
+        );
+
+        return (int) $portInput;
+    }
 }
