@@ -378,6 +378,13 @@ final class CreateAppCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
+        // Store mode flags for signal handler
+        $this->isQuietMode = $isQuiet;
+        $this->isJsonMode = $isJson;
+
+        // Register signal handlers for Ctrl+C cleanup
+        $this->registerSignalHandlers();
+
         // Track app path for cleanup on failure
         $appPath = null;
         $appCreated = false;
@@ -470,8 +477,10 @@ final class CreateAppCommand extends BaseMakeCommand
             $appsDir = "{$root}/apps";
             $filesystem = $this->filesystem();
 
-            // Mark that app directory will be created
+            // Mark that app directory will be created and store for signal handler
             $appCreated = true;
+            $this->workspacePathForCleanup = $appPath;
+            $this->workspaceCreatedForCleanup = true;
 
             $steps = [
                 'Installing application framework' => fn (): bool => $this->runInstallCommand($appType, $config, $appsDir, $isVerbose),

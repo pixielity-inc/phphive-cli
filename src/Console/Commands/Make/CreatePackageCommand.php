@@ -206,6 +206,13 @@ final class CreatePackageCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
+        // Store mode flags for signal handler
+        $this->isQuietMode = $isQuiet;
+        $this->isJsonMode = $isJson;
+
+        // Register signal handlers for Ctrl+C cleanup
+        $this->registerSignalHandlers();
+
         // Track package path for cleanup on failure
         $packagePath = null;
         $packageCreated = false;
@@ -270,8 +277,10 @@ final class CreatePackageCommand extends BaseMakeCommand
             $root = $this->getMonorepoRoot();
             $packagePath = "{$root}/packages/{$name}";
 
-            // Mark that package directory will be created
+            // Mark that package directory will be created and store for signal handler
             $packageCreated = true;
+            $this->workspacePathForCleanup = $packagePath;
+            $this->workspaceCreatedForCleanup = true;
 
             $steps = [
                 'Checking name availability' => fn (): bool => $this->checkNameAvailability($name, $packagePath),

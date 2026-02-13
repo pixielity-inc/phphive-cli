@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Console\Commands\Make;
 
+use Exception;
 use PhpHive\Cli\Console\Commands\BaseCommand;
 use PhpHive\Cli\Support\PreflightResult;
 
@@ -55,6 +56,103 @@ use function sprintf;
  */
 abstract class BaseMakeCommand extends BaseCommand
 {
+    /**
+     * Workspace path being created (for cleanup on signal).
+     */
+    protected ?string $workspacePathForCleanup = null;
+
+    /**
+     * Whether workspace was created (for cleanup on signal).
+     */
+    protected bool $workspaceCreatedForCleanup = false;
+
+    /**
+     * Quiet mode flag (for cleanup on signal).
+     */
+    protected bool $isQuietMode = false;
+
+    /**
+     * JSON mode flag (for cleanup on signal).
+     */
+    protected bool $isJsonMode = false;
+
+    /**
+     * Register signal handlers for graceful cleanup on interruption.
+     *
+     * This method registers handlers for SIGINT (Ctrl+C) and SIGTERM signals
+     * to ensure proper cleanup when the user cancels the operation.
+     *
+     * The signal handler will:
+     * - Display a cancellation message
+     * - Call cleanupFailedWorkspace() if workspace was created
+     * - Exit with failure code
+     *
+     * Example usage:
+     * ```php
+     * $this->registerSignalHandlers();
+     * $this->workspacePathForCleanup = $appPath;
+     * $this->workspaceCreatedForCleanup = true;
+     * ```
+     */
+    protected function registerSignalHandlers(): void
+    {
+        // Check if pcntl extension is available
+        if (! function_exists('pcntl_signal')) {
+            return;
+        }
+
+        // Enable async signal handling
+        if (function_exists('pcntl_async_signals')) {
+            pcntl_async_signals(true);
+        }
+
+        // Register SIGINT handler (Ctrl+C)
+        pcntl_signal(SIGINT, function (): void {
+            if (! $this->isQuietMode && ! $this->isJsonMode) {
+                $this->line('');
+                $this->warning('Operation cancelled by user.');
+            }
+
+            // Cleanup if workspace was created
+            if ($this->workspaceCreatedForCleanup && $this->workspacePathForCleanup !== null) {
+                if (! $this->isQuietMode && ! $this->isJsonMode) {
+                    $this->warning('Cleaning up...');
+                }
+
+                $this->cleanupFailedWorkspace(
+                    $this->workspacePathForCleanup,
+                    $this->isQuietMode,
+                    $this->isJsonMode
+                );
+            }
+
+            exit(1);
+        });
+
+        // Register SIGTERM handler
+        pcntl_signal(SIGTERM, function (): void {
+            if (! $this->isQuietMode && ! $this->isJsonMode) {
+                $this->line('');
+                $this->warning('Operation terminated.');
+            }
+
+            // Cleanup if workspace was created
+            if ($this->workspaceCreatedForCleanup && $this->workspacePathForCleanup !== null) {
+                if (! $this->isQuietMode && ! $this->isJsonMode) {
+                    $this->warning('Cleaning up...');
+                }
+
+                $this->cleanupFailedWorkspace(
+                    $this->workspacePathForCleanup,
+                    $this->isQuietMode,
+                    $this->isJsonMode
+                );
+            }
+
+            exit(1);
+        });
+    }
+
     /**
      * Run preflight checks to validate the development environment.
      *

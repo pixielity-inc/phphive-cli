@@ -179,6 +179,13 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
+        // Store mode flags for signal handler
+        $this->isQuietMode = $isQuiet;
+        $this->isJsonMode = $isJson;
+
+        // Register signal handlers for Ctrl+C cleanup
+        $this->registerSignalHandlers();
+
         // Track workspace path for cleanup on failure
         $workspacePath = null;
         $workspaceCreated = false;
@@ -205,9 +212,11 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             // Step 2: Get and validate workspace name
             $name = $this->getValidatedWorkspaceName($input, $isQuiet, $isJson);
 
-            // Track workspace path for cleanup
+            // Track workspace path for cleanup and store for signal handler
             $workspacePath = getcwd() . "/{$name}";
             $workspaceCreated = true;
+            $this->workspacePathForCleanup = $workspacePath;
+            $this->workspaceCreatedForCleanup = true;
 
             // Step 3: Execute workspace creation with progress feedback
             $steps = [
