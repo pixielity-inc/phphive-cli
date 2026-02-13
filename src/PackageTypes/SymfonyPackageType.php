@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpHive\Cli\PackageTypes;
 
 use Override;
+use PhpHive\Cli\Enums\PackageType;
 
 /**
  * Symfony Package Type.
@@ -13,6 +14,14 @@ use Override;
  * scaffolding for Symfony-specific features and conventions. Symfony bundles
  * are reusable components that extend Symfony applications with services,
  * controllers, commands, and other Symfony functionality.
+ *
+ * Stub Processing:
+ * This package type uses Pixielity\StubGenerator\Facades\Stub for template
+ * processing. The Stub facade handles:
+ * - Loading stub files from the path returned by getStubPath()
+ * - Automatic UPPERCASE conversion of variable names
+ * - Replacing placeholders with actual values from prepareVariables()
+ * - Generating final package files from templates
  *
  * Symfony Bundle Features:
  * - Bundle class for bundle registration and configuration
@@ -138,7 +147,7 @@ final class SymfonyPackageType extends AbstractPackageType
      */
     public function getType(): string
     {
-        return self::TYPE_SYMFONY;
+        return PackageType::SYMFONY->value;
     }
 
     /**
@@ -204,8 +213,8 @@ final class SymfonyPackageType extends AbstractPackageType
     public function getFileNamingRules(): array
     {
         return [
-            '/src/Bundle.php' => '/src/' . self::VAR_PACKAGE_NAMESPACE . 'Bundle.php',
-            '/src/DependencyInjection/Extension.php' => '/src/DependencyInjection/' . self::VAR_PACKAGE_NAMESPACE . 'Extension.php',
+            '/src/Bundle.php' => '/src/{{PACKAGE_NAMESPACE}}Bundle.php',
+            '/src/DependencyInjection/Extension.php' => '/src/DependencyInjection/{{PACKAGE_NAMESPACE}}Extension.php',
         ];
     }
 }

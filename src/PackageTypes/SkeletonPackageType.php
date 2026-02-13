@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\PackageTypes;
 
+use PhpHive\Cli\Enums\PackageType;
+
 /**
  * Skeleton Package Type.
  *
@@ -11,6 +13,14 @@ namespace PhpHive\Cli\PackageTypes;
  * providing a lightweight scaffolding for framework-agnostic PHP libraries.
  * This package type is ideal for creating reusable PHP components that don't
  * require framework-specific features or conventions.
+ *
+ * Stub Processing:
+ * This package type uses Pixielity\StubGenerator\Facades\Stub for template
+ * processing. The Stub facade handles:
+ * - Loading stub files from the path returned by getStubPath()
+ * - Automatic UPPERCASE conversion of variable names
+ * - Replacing placeholders with actual values from prepareVariables()
+ * - Generating final package files from templates
  *
  * Skeleton Package Features:
  * - Minimal composer.json with essential configuration
@@ -154,7 +164,7 @@ final class SkeletonPackageType extends AbstractPackageType
      */
     public function getType(): string
     {
-        return self::TYPE_SKELETON;
+        return PackageType::SKELETON->value;
     }
 
     /**

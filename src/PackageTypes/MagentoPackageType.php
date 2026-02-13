@@ -6,6 +6,7 @@ namespace PhpHive\Cli\PackageTypes;
 
 use Exception;
 use Override;
+use PhpHive\Cli\Enums\PackageType;
 
 /**
  * Magento Package Type.
@@ -14,6 +15,14 @@ use Override;
  * scaffolding for Magento-specific features and conventions. Magento modules
  * are reusable components that extend Magento applications with custom
  * functionality, integrations, and business logic.
+ *
+ * Stub Processing:
+ * This package type uses Pixielity\StubGenerator\Facades\Stub for template
+ * processing. The Stub facade handles:
+ * - Loading stub files from the path returned by getStubPath()
+ * - Automatic UPPERCASE conversion of variable names
+ * - Replacing placeholders with actual values from prepareVariables()
+ * - Generating final package files from templates
  *
  * Magento Module Features:
  * - ComponentRegistrar for module registration
@@ -184,7 +193,7 @@ final class MagentoPackageType extends AbstractPackageType
      */
     public function getType(): string
     {
-        return self::TYPE_MAGENTO;
+        return PackageType::MAGENTO->value;
     }
 
     /**
@@ -218,9 +227,13 @@ final class MagentoPackageType extends AbstractPackageType
     /**
      * Prepare variables for Magento module stub template processing.
      *
-     * Extends parent variables with Magento-specific placeholders:
+     * Extends parent variables with Magento-specific placeholders processed by
+     * the Pixielity\StubGenerator\Facades\Stub facade:
      * - {{MODULE_NAME}}: Magento module name in Vendor_Module format
      * - {{PACKAGE_NAME_NORMALIZED}}: Kebab-case package name for routes
+     *
+     * Note: The Stub facade automatically converts variable names to UPPERCASE
+     * when processing templates.
      *
      * Example transformations for package 'test-magento':
      * - {{MODULE_NAME}} -> 'Monorepo_TestMagento'
@@ -228,7 +241,7 @@ final class MagentoPackageType extends AbstractPackageType
      *
      * @param  string                $name        Package name
      * @param  string                $description Package description
-     * @return array<string, string> Variables for template replacement
+     * @return array<string, string> Variables for template replacement via Stub facade
      */
     #[Override]
     public function prepareVariables(string $name, string $description): array
@@ -236,17 +249,22 @@ final class MagentoPackageType extends AbstractPackageType
         $variables = parent::prepareVariables($name, $description);
 
         // Add Magento-specific variables
-        $packageNamespace = $variables[self::VAR_PACKAGE_NAMESPACE];
+        $packageNamespace = $variables['package_namespace'];
 
         // For Magento, create module name format (Vendor_Module)
+        // Replace any hyphens with underscores in the namespace part
         // Example: 'test-magento' -> 'Monorepo_TestMagento'
-        $moduleName = 'Monorepo_' . $packageNamespace;
+        // Example: 'my-custom-module' -> 'Monorepo_MyCustomModule'
+        $moduleName = 'Monorepo_' . str_replace('-', '_', $packageNamespace);
 
-        // Normalized package name (kebab-case)
-        $normalized = strtolower(str_replace('_', '-', $name));
+        // Create route ID (must use underscores, not hyphens)
+        // Example: 'test-magento-new' -> 'test_magento_new'
+        $routeId = str_replace('-', '_', $name);
 
-        $variables['{{MODULE_NAME}}'] = $moduleName;
-        $variables['{{PACKAGE_NAME_NORMALIZED}}'] = $normalized;
+        // Use lowercase keys - Stub facade will convert them to UPPERCASE
+        // and wrap with {{KEY}} delimiters automatically
+        $variables['module_name'] = $moduleName;
+        $variables['route_id'] = $routeId;
 
         return $variables;
     }

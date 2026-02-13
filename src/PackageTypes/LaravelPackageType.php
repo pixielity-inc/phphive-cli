@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpHive\Cli\PackageTypes;
 
 use Override;
+use PhpHive\Cli\Enums\PackageType;
 
 /**
  * Laravel Package Type.
@@ -13,6 +14,14 @@ use Override;
  * scaffolding for Laravel-specific features and conventions. Laravel packages
  * are reusable components that can be integrated into Laravel applications,
  * offering services, commands, views, and other Laravel functionality.
+ *
+ * Stub Processing:
+ * This package type uses Pixielity\StubGenerator\Facades\Stub for template
+ * processing. The Stub facade handles:
+ * - Loading stub files from the path returned by getStubPath()
+ * - Automatic UPPERCASE conversion of variable names
+ * - Replacing placeholders with actual values from prepareVariables()
+ * - Generating final package files from templates
  *
  * Laravel Package Features:
  * - Service Provider for package registration and bootstrapping
@@ -102,7 +111,7 @@ final class LaravelPackageType extends AbstractPackageType
      */
     public function getType(): string
     {
-        return self::TYPE_LARAVEL;
+        return PackageType::LARAVEL->value;
     }
 
     /**
@@ -161,7 +170,7 @@ final class LaravelPackageType extends AbstractPackageType
     public function getFileNamingRules(): array
     {
         return [
-            '/src/Providers/ServiceProvider.php' => '/src/Providers/' . self::VAR_PACKAGE_NAMESPACE . 'ServiceProvider.php',
+            '/src/Providers/ServiceProvider.php' => '/src/Providers/{{PACKAGE_NAMESPACE}}ServiceProvider.php',
         ];
     }
 }

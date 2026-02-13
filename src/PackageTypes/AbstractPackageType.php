@@ -89,10 +89,15 @@ abstract class AbstractPackageType implements PackageTypeInterface
     /**
      * Get the stub directory path for this package type.
      *
-     * Constructs the full path to the stub template directory for this package
-     * type by combining the base stubs path with the package type identifier.
-     * The stub directory contains template files that are copied and processed
-     * during package creation.
+     * Returns the path used by Pixielity\StubGenerator\Facades\Stub for loading
+     * package template files. This path is set via Stub::setBasePath() before
+     * processing stub templates.
+     *
+     * The Stub facade handles:
+     * - Loading stub files from the returned path
+     * - Processing template variables (automatic UPPERCASE conversion)
+     * - Replacing placeholders with actual values
+     * - Generating final package files
      *
      * Directory structure:
      * ```
@@ -110,8 +115,11 @@ abstract class AbstractPackageType implements PackageTypeInterface
      * - README.md.stub: Package documentation template
      * - .gitignore: Version control exclusions
      *
+     * Note: Variable names are automatically converted to UPPERCASE by the Stub
+     * facade (e.g., 'package_name' becomes '{{PACKAGE_NAME}}' in templates).
+     *
      * @param  string $stubsBasePath Base path to stubs directory (e.g., '/path/to/cli/stubs')
-     * @return string Full path to package type stubs (e.g., '/path/to/cli/stubs/packages/laravel')
+     * @return string Full path compatible with Stub::setBasePath() (e.g., '/path/to/cli/stubs/packages/laravel')
      */
     public function getStubPath(string $stubsBasePath): string
     {
@@ -121,10 +129,10 @@ abstract class AbstractPackageType implements PackageTypeInterface
     /**
      * Prepare variables for stub template processing.
      *
-     * Generates an associative array of placeholder => value pairs used to
-     * replace placeholders in stub template files. This method creates the
-     * common variables that all package types need, including package names,
-     * namespaces, and metadata.
+     * Generates an associative array of placeholder => value pairs used by the
+     * Pixielity\StubGenerator\Facades\Stub facade to replace placeholders in
+     * stub template files. This method creates the common variables that all
+     * package types need, including package names, namespaces, and metadata.
      *
      * Variable generation process:
      * 1. Convert package name to PascalCase namespace (e.g., 'test-laravel' -> 'TestLaravel')
@@ -132,7 +140,7 @@ abstract class AbstractPackageType implements PackageTypeInterface
      * 3. Build full PHP namespace (e.g., 'PhpHive\TestLaravel')
      * 4. Include metadata (description, author information)
      *
-     * Generated variables:
+     * Generated variables (processed by Stub facade):
      * - {{PACKAGE_NAME}}: Original package name as provided by user
      * - {{PACKAGE_NAMESPACE}}: PascalCase namespace component
      * - {{COMPOSER_PACKAGE_NAME}}: Full composer package name (vendor/package)
@@ -140,6 +148,10 @@ abstract class AbstractPackageType implements PackageTypeInterface
      * - {{AUTHOR_NAME}}: Package author name
      * - {{AUTHOR_EMAIL}}: Package author email
      * - {{NAMESPACE}}: Full PHP namespace for PSR-4 autoloading
+     *
+     * Note: The Stub facade automatically converts variable names to UPPERCASE
+     * when processing templates. Variable keys should match the placeholder
+     * format used in stub files (e.g., '{{PACKAGE_NAME}}').
      *
      * Example usage in stub files:
      * ```php
@@ -156,7 +168,7 @@ abstract class AbstractPackageType implements PackageTypeInterface
      *
      * @param  string                $name        Package name (e.g., 'test-laravel')
      * @param  string                $description Package description
-     * @return array<string, string> Associative array of placeholder => value pairs
+     * @return array<string, string> Associative array of placeholder => value pairs for Stub facade
      */
     public function prepareVariables(string $name, string $description): array
     {
@@ -166,14 +178,17 @@ abstract class AbstractPackageType implements PackageTypeInterface
         // Generate composer package name (e.g., 'phphive/test-laravel')
         $composerPackageName = $this->generateComposerPackageName($name);
 
+        // Return lowercase keys - Stub facade will convert them to UPPERCASE
+        // and wrap with {{KEY}} or $KEY$ delimiters automatically
         return [
-            self::VAR_PACKAGE_NAME => $name,
-            self::VAR_PACKAGE_NAMESPACE => $packageNamespace,
-            self::VAR_COMPOSER_PACKAGE_NAME => $composerPackageName,
-            self::VAR_DESCRIPTION => $description,
-            self::VAR_AUTHOR_NAME => 'PhpHive Team',
-            self::VAR_AUTHOR_EMAIL => 'team@phphive.com',
-            self::VAR_NAMESPACE => "PhpHive\\{$packageNamespace}",
+            'package_name' => $name,
+            'package_name_normalized' => $name, // Normalized version (same as package_name for kebab-case)
+            'package_namespace' => $packageNamespace,
+            'composer_package_name' => $composerPackageName,
+            'description' => $description,
+            'author_name' => 'PhpHive Team',
+            'author_email' => 'team@phphive.com',
+            'namespace' => "PhpHive\\{$packageNamespace}",
         ];
     }
 
