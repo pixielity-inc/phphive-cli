@@ -233,12 +233,8 @@ trait InteractsWithDatabase
      */
     protected function setupDockerDatabase(string $appName, array $supportedDatabases, string $appPath): ?array
     {
-        // Docker setup requires interactive mode for configuration prompts
-        if (! $this->input->isInteractive()) {
-            return null;
-        }
-
         // Prompt user to select database type (MySQL, PostgreSQL, MariaDB)
+        // In non-interactive mode, uses first supported database type
         $dbTypeEnum = $this->promptDatabaseType($supportedDatabases);
 
         // Ask if user wants to include database admin tool (phpMyAdmin/Adminer)
@@ -445,11 +441,6 @@ trait InteractsWithDatabase
      */
     protected function promptAutomaticDatabaseSetup(string $appName): ?array
     {
-        // Automatic setup requires interactive mode for credential prompts
-        if (! $this->input->isInteractive()) {
-            return null;
-        }
-
         // Explain automatic setup process to user
         $this->note(
             'Automatic database setup will create a MySQL database and user for your application.',
@@ -626,19 +617,6 @@ trait InteractsWithDatabase
         // Normalize app name for use as database name (lowercase, alphanumeric + underscores)
         // Example: "My App!" becomes "my_app"
         $normalizedName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $appName) ?? $appName);
-
-        // In non-interactive mode, return sensible defaults for automated setups
-        if (! $this->input->isInteractive()) {
-            return [
-                AppTypeInterface::CONFIG_DB_TYPE => DatabaseType::MYSQL->value,
-                AppTypeInterface::CONFIG_DB_HOST => '127.0.0.1',
-                AppTypeInterface::CONFIG_DB_PORT => 3306,
-                AppTypeInterface::CONFIG_DB_NAME => $normalizedName,
-                AppTypeInterface::CONFIG_DB_USER => 'root',
-                AppTypeInterface::CONFIG_DB_PASSWORD => '',
-                AppTypeInterface::CONFIG_USING_DOCKER => false,
-            ];
-        }
 
         // Inform user about manual configuration requirements
         // User must have an existing database with proper credentials
