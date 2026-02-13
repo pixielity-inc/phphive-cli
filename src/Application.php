@@ -12,17 +12,9 @@ use const PHP_SAPI;
 
 use PhpHive\Cli\Concerns\ChecksForUpdates;
 use PhpHive\Cli\Concerns\HasDiscovery;
+use PhpHive\Cli\Concerns\InteractsWithDependencyInjection;
 use PhpHive\Cli\Concerns\InteractsWithPrompts;
-use PhpHive\Cli\Factories\AppTypeFactory;
-use PhpHive\Cli\Factories\PackageTypeFactory;
-use PhpHive\Cli\Services\NameSuggestionService;
-use PhpHive\Cli\Support\Composer;
-use PhpHive\Cli\Support\Container;
-use PhpHive\Cli\Support\Docker;
 use PhpHive\Cli\Support\Filesystem;
-use PhpHive\Cli\Support\PreflightChecker;
-use PhpHive\Cli\Support\Process;
-use PhpHive\Cli\Support\Reflection;
 
 use function sprintf;
 
@@ -32,7 +24,6 @@ use Symfony\Component\Console\Exception\CommandNotFoundException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Finder\Finder;
 
 /**
  * CLI Application.
@@ -63,6 +54,7 @@ final class Application extends BaseApplication
 {
     use ChecksForUpdates;
     use HasDiscovery;
+    use InteractsWithDependencyInjection;
     use InteractsWithPrompts;
 
     /**
@@ -84,14 +76,6 @@ final class Application extends BaseApplication
     private static bool $bannerDisplayed = false;
 
     /**
-     * The dependency injection container.
-     *
-     * Provides service location and dependency resolution for commands
-     * and other application components.
-     */
-    private Container $container;
-
-    /**
      * Whether the application has been booted.
      *
      * Prevents duplicate command registration if boot() is called multiple times.
@@ -110,10 +94,7 @@ final class Application extends BaseApplication
         parent::__construct(self::APP_NAME, self::APP_VERSION);
 
         // Initialize dependency injection container
-        $this->container = new Container();
-
-        // Register core services in the container
-        $this->registerServices();
+        $this->initializeContainer();
 
         // Set default command (shown when no command is specified)
         $this->setDefaultCommand('list');
@@ -202,19 +183,6 @@ final class Application extends BaseApplication
 
         // Execute the requested command
         return parent::run($input, $output);
-    }
-
-    /**
-     * Get the dependency injection container.
-     *
-     * Provides access to the application's DI container for service
-     * resolution and dependency management.
-     *
-     * @return Container The application's DI container
-     */
-    public function container(): Container
-    {
-        return $this->container;
     }
 
     /**
@@ -312,127 +280,10 @@ final class Application extends BaseApplication
         $command = new $commandClass();
 
         // Inject container if command supports it (e.g., extends BaseCommand)
-        if (Reflection::methodExists($command, 'setContainer')) {
-            // @phpstan-ignore-next-line Method exists on BaseCommand but not on Symfony Command
-            $command->setContainer($this->container);
-        }
+        $this->injectContainerIntoCommand($command);
 
         // Register command with Symfony Console
         $this->addCommand($command);
-    }
-
-    /**
-     * Register core services in the dependency injection container.
-     *
-     * This method registers all core application services as singletons
-     * in the container. Services registered here are available to all
-     * commands via dependency injection.
-     *
-     * Service Categories:
-     *
-     * Core Services:
-     * - Filesystem: File and directory operations
-     * - Process: Shell command execution with Symfony Process
-     * - Reflection: PHP reflection utilities
-     *
-     * Development Tools:
-     * - Composer: Composer dependency management operations
-     * - Docker: Docker and Docker Compose container operations
-     *
-     * Utilities:
-     * - Finder: Symfony Finder for file/directory discovery
-     * - PreflightChecker: Environment validation before operations
-     * - NameSuggestionService: Name suggestion when conflicts occur
-     *
-     * Factories:
-     * - AppTypeFactory: Creates application type instances
-     * - PackageTypeFactory: Creates package type instances
-     *
-     * All services are registered as singletons to ensure a single instance
-     * is shared across the application lifecycle, improving performance and
-     * maintaining consistent state.
-     */
-    private function registerServices(): void
-    {
-        // =====================================================================
-        // CORE SERVICES
-        // =====================================================================
-
-        // Filesystem service for file and directory operations
-        $this->container->singleton(
-            Filesystem::class,
-            Filesystem::make(...)
-        );
-
-        // Process service for executing shell commands
-        $this->container->singleton(
-            Process::class,
-            Process::make(...)
-        );
-
-        // Reflection utilities for PHP introspection
-        $this->container->singleton(
-            Reflection::class,
-            fn (): Reflection => new Reflection()
-        );
-
-        // =====================================================================
-        // DEVELOPMENT TOOLS
-        // =====================================================================
-
-        // Composer service for dependency management
-        $this->container->singleton(
-            Composer::class,
-            Composer::make(...)
-        );
-
-        // Docker service for container operations
-        $this->container->singleton(
-            Docker::class,
-            Docker::make(...)
-        );
-
-        // =====================================================================
-        // UTILITIES
-        // =====================================================================
-
-        // Symfony Finder for file/directory discovery
-        $this->container->singleton(
-            Finder::class,
-            fn (): Finder => new Finder()
-        );
-
-        // Preflight checker for environment validation
-        $this->container->singleton(
-            PreflightChecker::class,
-            fn (Container $c): PreflightChecker => PreflightChecker::make(
-                $c->make(Process::class)
-            )
-        );
-
-        // Name suggestion service for conflict resolution
-        $this->container->singleton(
-            NameSuggestionService::class,
-            NameSuggestionService::make(...)
-        );
-
-        // =====================================================================
-        // FACTORIES
-        // =====================================================================
-
-        // App type factory for creating application instances
-        $this->container->singleton(
-            AppTypeFactory::class,
-            fn (): AppTypeFactory => new AppTypeFactory()
-        );
-
-        // Package type factory for creating package instances
-        $this->container->singleton(
-            PackageTypeFactory::class,
-            fn (Container $c): PackageTypeFactory => new PackageTypeFactory(
-                $c->make(Composer::class)
-            )
-        );
     }
 
     /**
