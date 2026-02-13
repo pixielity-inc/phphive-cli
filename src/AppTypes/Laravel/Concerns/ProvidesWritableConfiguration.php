@@ -84,7 +84,7 @@ trait ProvidesWritableConfiguration
         if (($config['use_redis'] ?? false) === true) {
             $envVars['REDIS_HOST'] = $config['redis_host'] ?? 'redis';
             $envVars['REDIS_PORT'] = $config['redis_port'] ?? '6379';
-            if (! empty($config['redis_password'])) {
+            if (isset($config['redis_password']) && $config['redis_password'] !== '') {
                 $envVars['REDIS_PASSWORD'] = $config['redis_password'];
             }
             $envVars['CACHE_DRIVER'] = CacheDriver::REDIS->value;
@@ -93,7 +93,7 @@ trait ProvidesWritableConfiguration
         }
 
         // Mail configuration (if provided)
-        if (! empty($config['mail_host'])) {
+        if (isset($config['mail_host']) && $config['mail_host'] !== '') {
             $envVars['MAIL_MAILER'] = MailDriver::SMTP->value;
             $envVars['MAIL_HOST'] = $config['mail_host'];
             $envVars['MAIL_PORT'] = $config['mail_port'] ?? '1025';
@@ -107,7 +107,7 @@ trait ProvidesWritableConfiguration
         // Meilisearch configuration (if enabled)
         if (($config['use_meilisearch'] ?? false) === true) {
             $envVars['MEILISEARCH_HOST'] = $config['meilisearch_host'] ?? 'http://meilisearch:7700';
-            if (! empty($config['meilisearch_key'])) {
+            if (isset($config['meilisearch_key']) && $config['meilisearch_key'] !== '') {
                 $envVars['MEILISEARCH_KEY'] = $config['meilisearch_key'];
             }
             $envVars['SCOUT_DRIVER'] = SearchEngine::MEILISEARCH->value;

@@ -43,7 +43,7 @@ trait CollectsVersionConfiguration
             default: 'v' . LaravelVersion::default()->value
         );
 
-        $version = LaravelVersion::fromString($versionKey);
+        $version = LaravelVersion::fromString((string) $versionKey);
 
         return [
             // Return numeric version string for use in composer commands

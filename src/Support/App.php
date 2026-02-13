@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Support;
 
+use Closure;
 use PhpHive\Cli\Application;
 
 /**
@@ -89,6 +90,7 @@ final class App
      */
     public static function __callStatic(string $method, array $parameters): mixed
     {
+        // @phpstan-ignore-next-line Dynamic method call on container for facade pattern
         return self::container()->$method(...$parameters);
     }
 
@@ -155,11 +157,11 @@ final class App
      * $composer = App::make(Composer::class);
      * ```
      *
-     * @template T
+     * @template T of object
      *
-     * @param  class-string<T>|string $abstract   The class name or binding key to resolve
-     * @param  array<mixed>           $parameters Optional parameters to pass to the constructor
-     * @return T|mixed                The resolved instance
+     * @param  class-string<T> $abstract   The class name or binding key to resolve
+     * @param  array<mixed>    $parameters Optional parameters to pass to the constructor
+     * @return T               The resolved instance
      */
     public static function make(string $abstract, array $parameters = []): mixed
     {
@@ -199,10 +201,10 @@ final class App
      * App::singleton(MyService::class, fn() => new MyService());
      * ```
      *
-     * @param string        $abstract The class name or binding key
-     * @param callable|null $concrete Optional closure that creates the instance
+     * @param string                                   $abstract The class name or binding key
+     * @param (Closure(Container): object)|string|null $concrete Optional closure that creates the instance
      */
-    public static function singleton(string $abstract, ?callable $concrete = null): void
+    public static function singleton(string $abstract, Closure|string|null $concrete = null): void
     {
         self::container()->singleton($abstract, $concrete);
     }
@@ -219,10 +221,10 @@ final class App
      * App::bind(MyService::class, fn() => new MyService());
      * ```
      *
-     * @param string        $abstract The class name or binding key
-     * @param callable|null $concrete Optional closure that creates the instance
+     * @param string                                   $abstract The class name or binding key
+     * @param (Closure(Container): object)|string|null $concrete Optional closure that creates the instance
      */
-    public static function bind(string $abstract, ?callable $concrete = null): void
+    public static function bind(string $abstract, Closure|string|null $concrete = null): void
     {
         self::container()->bind($abstract, $concrete);
     }

@@ -96,7 +96,7 @@ trait ProvidesWritableConfiguration
         }
 
         // Mailer configuration (if provided)
-        if (! empty($config['mail_host'])) {
+        if (isset($config['mail_host']) && $config['mail_host'] !== '') {
             $mailHost = $config['mail_host'];
             $mailPort = $config['mail_port'] ?? '1025';
             $mailUser = $config['mail_username'] ?? '';

@@ -631,13 +631,14 @@ final class DoctorCommand extends BaseCommand
 
         foreach ($this->checkResults as $checkResult) {
             $rows[] = [
-                $checkResult['component'],
-                $checkResult['status'],
-                $checkResult['severity'],
-                $checkResult['details'],
+                (string) $checkResult['component'],
+                (string) $checkResult['status'],
+                (string) $checkResult['severity'],
+                (string) $checkResult['details'],
             ];
         }
 
+        /* @var array<int, array<int, string>> $rows */
         $this->table($headers, $rows);
         $this->line('');
     }
@@ -708,7 +709,10 @@ final class DoctorCommand extends BaseCommand
             'timestamp' => date('c'),
         ];
 
-        $this->line(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $jsonOutput = json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($jsonOutput !== false) {
+            $this->line($jsonOutput);
+        }
 
         return $allPassed ? Command::SUCCESS : Command::FAILURE;
     }

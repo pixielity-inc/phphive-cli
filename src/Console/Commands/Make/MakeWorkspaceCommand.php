@@ -297,21 +297,20 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
                 label: 'What is the workspace name?',
                 placeholder: 'my-project',
                 required: true,
-                validate: $this->validateName(...),
+                validate: fn ($value) => (is_string($value) && $value !== '' && preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $value) === 1) ? null : 'Workspace name must be lowercase alphanumeric with hyphens (e.g., my-project)',
             );
         }
 
-        // Validate workspace name
-        $validation = $this->validateName($name);
-
-        if ($validation !== null) {
+        // Validate workspace name (inline validation)
+        if (! is_string($name) || $name === '' || preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $name) !== 1) {
+            $errorMsg = 'Workspace name must be lowercase alphanumeric with hyphens (e.g., my-project)';
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
-                    'error' => $validation,
+                    'error' => $errorMsg,
                 ]);
             } else {
-                $this->error($validation);
+                $this->error($errorMsg);
             }
             exit(Command::FAILURE);
         }
@@ -330,7 +329,7 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
         $suggestions = $nameSuggestionService->suggest(
             $name,
             'workspace',
-            fn (string $suggestedName): bool => ! $this->filesystem()->isDirectory($suggestedName)
+            fn (?string $suggestedName): bool => is_string($suggestedName) && $suggestedName !== '' && ! $this->filesystem()->isDirectory($suggestedName)
         );
 
         if ($suggestions === []) {

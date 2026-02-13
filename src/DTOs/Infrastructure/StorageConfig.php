@@ -155,14 +155,17 @@ final readonly class StorageConfig
             AppTypeInterface::CONFIG_USING_DOCKER => $this->usingDocker,
         ];
 
-        // Add driver-specific configuration
-        if ($this->driver === StorageDriver::MINIO) {
-            $config['storage_endpoint'] = $this->endpoint;
-            $config['storage_port'] = $this->port;
-            $config['storage_console_port'] = $this->consolePort;
-        } elseif ($this->driver === StorageDriver::S3) {
-            $config['storage_region'] = $this->region;
-        }
+        // Add driver-specific configuration using match expression
+        match ($this->driver) {
+            StorageDriver::MINIO => $config = array_merge($config, [
+                'storage_endpoint' => $this->endpoint,
+                'storage_port' => $this->port,
+                'storage_console_port' => $this->consolePort,
+            ]),
+            StorageDriver::S3 => $config = array_merge($config, [
+                'storage_region' => $this->region,
+            ]),
+        };
 
         return $config;
     }

@@ -199,9 +199,9 @@ final class VersionCommand extends BaseCommand
 
         // Handle --tool option for selective display
         // If specified, only show version for that specific tool
-        $tool = $this->option('tool');
-        if ($tool !== null) {
-            return $this->displaySingleTool($tool, $versions);
+        $toolOption = $this->option('tool');
+        if ($toolOption !== null && $toolOption !== '') {
+            return $this->displaySingleTool($toolOption, $versions);
         }
 
         // =====================================================================
@@ -324,12 +324,19 @@ final class VersionCommand extends BaseCommand
      * - "Not installed" message if tool not found
      * - Error message if tool name is invalid
      *
-     * @param  string                     $tool     Tool name (cli, php, composer, turbo, node, pnpm)
+     * @param  string|mixed               $tool     Tool name (cli, php, composer, turbo, node, pnpm)
      * @param  array<string, string|null> $versions Version data from gatherVersions()
      * @return int                        Exit code (SUCCESS if found, FAILURE if not)
      */
-    private function displaySingleTool(string $tool, array $versions): int
+    private function displaySingleTool(mixed $tool, array $versions): int
     {
+        // Ensure tool is a string
+        if (! is_string($tool)) {
+            $this->error('Tool name must be a string');
+
+            return Command::FAILURE;
+        }
+
         // Normalize tool name to lowercase for case-insensitive matching
         $tool = strtolower($tool);
 
@@ -344,8 +351,8 @@ final class VersionCommand extends BaseCommand
         // Get version for the specified tool
         $version = $versions[$tool];
 
-        // Check if tool is installed
-        if ($version === null) {
+        // Check if tool is installed (check for empty string or null)
+        if ($version === '' || ! is_string($version)) {
             $this->line('Not installed');
 
             return Command::FAILURE;
@@ -407,7 +414,10 @@ final class VersionCommand extends BaseCommand
         ];
 
         // Output as pretty-printed JSON
-        $this->line(json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $jsonOutput = json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($jsonOutput !== false) {
+            $this->line($jsonOutput);
+        }
 
         return Command::SUCCESS;
     }
@@ -539,8 +549,9 @@ final class VersionCommand extends BaseCommand
         // Display Turbo version if installed
         // Turbo is the build system for monorepo task orchestration
         $this->info('Turbo:');
-        if ($versions['turbo'] !== null && $versions['turbo'] !== '') {
-            $this->line('  Version: ' . $versions['turbo']);
+        $turboVersion = $versions['turbo'];
+        if (is_string($turboVersion) && $turboVersion !== '') {
+            $this->line('  Version: ' . $turboVersion);
         } else {
             $this->line('  Not installed');
         }
@@ -553,8 +564,9 @@ final class VersionCommand extends BaseCommand
         // Display Node.js version if installed
         // Node.js is required for JavaScript/TypeScript tooling
         $this->info('Node.js:');
-        if ($versions['node'] !== null && $versions['node'] !== '') {
-            $this->line('  Version: ' . $versions['node']);
+        $nodeVersion = $versions['node'];
+        if (is_string($nodeVersion) && $nodeVersion !== '') {
+            $this->line('  Version: ' . $nodeVersion);
         } else {
             $this->line('  Not installed');
         }
@@ -567,8 +579,9 @@ final class VersionCommand extends BaseCommand
         // Display pnpm version if installed
         // pnpm is the package manager for JavaScript dependencies
         $this->info('pnpm:');
-        if ($versions['pnpm'] !== null && $versions['pnpm'] !== '') {
-            $this->line('  Version: ' . $versions['pnpm']);
+        $pnpmVersion = $versions['pnpm'];
+        if (is_string($pnpmVersion) && $pnpmVersion !== '') {
+            $this->line('  Version: ' . $pnpmVersion);
         } else {
             $this->line('  Not installed');
         }

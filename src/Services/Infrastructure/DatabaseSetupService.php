@@ -53,6 +53,12 @@ final readonly class DatabaseSetupService
      * @param Docker                 $docker                 Docker service for container operations
      * @param DockerComposeGenerator $dockerComposeGenerator Docker Compose file generator
      */
+    /**
+     * Create a new DatabaseSetupService instance.
+     *
+     * @param Docker                 $docker                 Docker service for container operations
+     * @param DockerComposeGenerator $dockerComposeGenerator Docker Compose file generator
+     */
     public function __construct(
         private Docker $docker,
         private DockerComposeGenerator $dockerComposeGenerator,
@@ -94,12 +100,16 @@ final readonly class DatabaseSetupService
      *
      * @return self A new DatabaseSetupService instance with dependencies
      */
+    /**
+     * Create a new DatabaseSetupService instance using static factory pattern.
+     *
+     * @return self A new DatabaseSetupService instance with dependencies
+     */
     public static function make(): self
     {
         return new self(
             docker: Docker::make(),
-            mysql: MySQLService::make(),
-            generator: DockerComposeGenerator::make(),
+            dockerComposeGenerator: DockerComposeGenerator::make(),
         );
     }
 

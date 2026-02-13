@@ -256,7 +256,10 @@ trait ChecksForUpdates
             'latestVersion' => $latestVersion,
         ];
 
-        $this->filesystem()->write($cacheFile, json_encode($cache, JSON_PRETTY_PRINT));
+        $content = json_encode($cache, JSON_PRETTY_PRINT);
+        if ($content !== false) {
+            $this->filesystem()->write($cacheFile, $content);
+        }
     }
 
     /**

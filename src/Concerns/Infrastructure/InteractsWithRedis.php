@@ -221,7 +221,7 @@ trait InteractsWithRedis
 
             // Offer Docker as a fallback option if available
             if ($this->isDockerAvailable() && $this->confirm('Use Docker instead?', true)) {
-                $dockerConfig = $this->setupDockerRedis($appName, getcwd() ?: '.');
+                $dockerConfig = $this->setupDockerRedis($appName, getcwd() ?? '.');
                 if ($dockerConfig !== null) {
                     return $dockerConfig;
                 }

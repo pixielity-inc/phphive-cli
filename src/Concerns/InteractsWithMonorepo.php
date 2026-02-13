@@ -179,7 +179,7 @@ trait InteractsWithMonorepo
             }
 
             // Find all subdirectories at depth 0
-            $finder = AppTypeInterface::make(Finder::class);
+            $finder = new Finder();
             $finder->directories()->in($dir)->depth(0);
 
             foreach ($finder as $directory) {
@@ -374,7 +374,7 @@ trait InteractsWithMonorepo
      * // Returns: ['api', 'calculator', 'shared-utils']
      * ```
      *
-     * @return array<string> Array of workspace names
+     * @return array<int, string> Array of workspace names
      */
     protected function getAllWorkspaceNames(): array
     {

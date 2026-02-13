@@ -328,17 +328,18 @@ final class BuildCommand extends BaseCommand
 
         // Display results in structured table format
         if ($tableOutput) {
+            $rows = array_map(
+                fn ($ws): array => [$ws, $success ? '✓ Built' : '✗ Failed', '-'],
+                $workspaces
+            );
+            // Add separator and summary row
+            $rows[] = ['', '', ''];
+            $rows[] = ['Total', $success ? '✓ Success' : '✗ Failed', "{$duration}s"];
+
+            /* @var array<int, array<int, string>> $rows */
             $this->table(
                 ['Workspace', 'Status', 'Duration'],
-                // Map workspaces to table rows with status
-                array_map(
-                    fn ($ws): array => [$ws, $success ? '✓ Built' : '✗ Failed', '-'],
-                    $workspaces
-                ) + [
-                    // Add separator and summary row
-                    ['', '', ''],
-                    ['Total', $success ? '✓ Success' : '✗ Failed', "{$duration}s"],
-                ]
+                $rows
             );
 
             return $success ? Command::SUCCESS : Command::FAILURE;

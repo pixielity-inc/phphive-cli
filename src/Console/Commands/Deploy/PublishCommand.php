@@ -337,16 +337,7 @@ final class PublishCommand extends BaseCommand
 
             // User cancelled - exit gracefully without error
             if (! $confirmed) {
-                if ($jsonOutput) {
-                    $this->outputJson([
-                        'status' => 'cancelled',
-                        'message' => 'Publish cancelled by user',
-                        'workspace' => $workspace,
-                        'timestamp' => date('c'),
-                    ]);
-                } else {
-                    $this->info('Publish cancelled');
-                }
+                $this->info('Publish cancelled');
 
                 return Command::SUCCESS;
             }

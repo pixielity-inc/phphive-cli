@@ -538,8 +538,8 @@ abstract class AbstractAppType implements AppTypeInterface
      * variables by calling parent::getCommonStubVariables() and merging
      * additional variables.
      *
-     * @param  array<string, mixed>  $config Configuration array from collectConfiguration()
-     * @return array<string, string> Associative array of placeholder => value pairs
+     * @param  array<string, mixed> $config Configuration array from collectConfiguration()
+     * @return array<string, mixed> Associative array of placeholder => value pairs
      */
     protected function getCommonStubVariables(array $config): array
     {

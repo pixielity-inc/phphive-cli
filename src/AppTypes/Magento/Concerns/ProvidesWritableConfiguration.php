@@ -85,7 +85,7 @@ trait ProvidesWritableConfiguration
         if (($config['use_redis'] ?? false) === true) {
             $envVars['REDIS_HOST'] = $config['redis_host'] ?? 'redis';
             $envVars['REDIS_PORT'] = $config['redis_port'] ?? '6379';
-            if (! empty($config['redis_password'])) {
+            if (isset($config['redis_password']) && $config['redis_password'] !== '') {
                 $envVars['REDIS_PASSWORD'] = $config['redis_password'];
             }
         }
@@ -100,7 +100,7 @@ trait ProvidesWritableConfiguration
         if (($config['use_meilisearch'] ?? false) === true) {
             $envVars['MEILISEARCH_HOST'] = $config['meilisearch_host'] ?? 'meilisearch';
             $envVars['MEILISEARCH_PORT'] = $config['meilisearch_port'] ?? '7700';
-            if (! empty($config['meilisearch_key'])) {
+            if (isset($config['meilisearch_key']) && $config['meilisearch_key'] !== '') {
                 $envVars['MEILISEARCH_KEY'] = $config['meilisearch_key'];
             }
         }

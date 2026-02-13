@@ -62,6 +62,13 @@ class SkeletonAppType extends AbstractAppType
     use ProvidesWritableConfiguration;
 
     /**
+     * Configuration array collected during collectConfiguration().
+     *
+     * @var array<string, mixed>
+     */
+    protected array $config = [];
+
+    /**
      * Get the application type name.
      *
      * Returns the display name for this application type, shown in the

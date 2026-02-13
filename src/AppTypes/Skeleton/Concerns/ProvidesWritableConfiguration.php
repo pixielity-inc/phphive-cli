@@ -65,7 +65,7 @@ trait ProvidesWritableConfiguration
         ];
 
         // Database configuration (if provided)
-        if (! empty($config['db_host'])) {
+        if (isset($config['db_host']) && $config['db_host'] !== '') {
             $envVars['DB_HOST'] = $config['db_host'];
             $envVars['DB_PORT'] = $config['db_port'] ?? '3306';
             $envVars['DB_NAME'] = $config['db_name'] ?? 'skeleton';
@@ -77,7 +77,7 @@ trait ProvidesWritableConfiguration
         if (($config['use_redis'] ?? false) === true) {
             $envVars['REDIS_HOST'] = $config['redis_host'] ?? 'redis';
             $envVars['REDIS_PORT'] = $config['redis_port'] ?? '6379';
-            if (! empty($config['redis_password'])) {
+            if (isset($config['redis_password']) && $config['redis_password'] !== '') {
                 $envVars['REDIS_PASSWORD'] = $config['redis_password'];
             }
         }

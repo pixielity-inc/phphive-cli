@@ -116,7 +116,7 @@ trait InteractsWithMagentoMarketplace
     protected function configureMagentoRepository(string $directory): void
     {
         // Add Magento repository using Composer service
-        $this->composerService()->run(
+        $this->composer()->run(
             $directory,
             ['config', 'repositories.magento', 'composer', 'https://repo.magento.com/']
         );
@@ -135,7 +135,7 @@ trait InteractsWithMagentoMarketplace
     protected function setMagentoAuth(string $directory, string $publicKey, string $privateKey): void
     {
         // Set authentication for repo.magento.com using Composer service
-        $this->composerService()->run(
+        $this->composer()->run(
             $directory,
             ['config', 'http-basic.repo.magento.com', $publicKey, $privateKey]
         );

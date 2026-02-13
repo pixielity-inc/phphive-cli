@@ -27,8 +27,17 @@ final readonly class SearchSetupService
      *
      * @param Process $process Process service
      */
+    /**
+     * Create a new search setup service instance.
+     *
+     * @param Docker     $docker     Docker service
+     * @param Process    $process    Process service
+     * @param Filesystem $filesystem Filesystem service
+     */
     public function __construct(
+        private Docker $docker,
         private Process $process,
+        private Filesystem $filesystem,
     ) {}
 
     /**
@@ -57,9 +66,18 @@ final readonly class SearchSetupService
      * @param Process    $process    Process service
      * @param Filesystem $filesystem Filesystem service
      */
-    public static function make(Docker $docker, Process $process, Filesystem $filesystem): self
+    /**
+     * Create a new instance using static factory pattern.
+     *
+     * @return self A new SearchSetupService instance with dependencies
+     */
+    public static function make(): self
     {
-        return new self($docker, $process, $filesystem);
+        return new self(
+            docker: Docker::make(),
+            process: Process::make(),
+            filesystem: Filesystem::make(),
+        );
     }
 
     /**

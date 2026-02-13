@@ -538,16 +538,29 @@ final class CreateAppCommand extends BaseMakeCommand
     {
         $name = $input->getArgument('name');
 
-        // Validate the name format first
-        $validation = $this->validateName($name);
-        if ($validation !== null) {
+        // Validate the name format first (inline validation)
+        if (! is_string($name) || $name === '') {
+            $errorMsg = 'Application name is required';
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
-                    'error' => $validation,
+                    'error' => $errorMsg,
                 ]);
             } else {
-                $this->error($validation);
+                $this->error($errorMsg);
+            }
+            exit(Command::FAILURE);
+        }
+
+        if (preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $name) !== 1) {
+            $errorMsg = 'Application name must be lowercase alphanumeric with hyphens (e.g., my-app)';
+            if ($isJson) {
+                $this->outputJson([
+                    'success' => false,
+                    'error' => $errorMsg,
+                ]);
+            } else {
+                $this->error($errorMsg);
             }
             exit(Command::FAILURE);
         }
@@ -569,7 +582,7 @@ final class CreateAppCommand extends BaseMakeCommand
         $suggestions = $nameSuggestionService->suggest(
             $name,
             'app',
-            fn (?string $suggestedName): bool => $this->validateName($suggestedName) === null && ! $this->filesystem()->isDirectory("{$root}/apps/{$suggestedName}")
+            fn (?string $suggestedName): bool => is_string($suggestedName) && $suggestedName !== '' && preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $suggestedName) === 1 && ! $this->filesystem()->isDirectory("{$root}/apps/{$suggestedName}")
         );
 
         if ($suggestions === []) {
@@ -610,16 +623,16 @@ final class CreateAppCommand extends BaseMakeCommand
             required: true
         );
 
-        // Validate the chosen name format
-        $validation = $this->validateName($choice);
-        if ($validation !== null) {
+        // Validate the chosen name format (inline validation)
+        if (! is_string($choice) || $choice === '' || preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $choice) !== 1) {
+            $errorMsg = 'Invalid application name format';
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
-                    'error' => $validation,
+                    'error' => $errorMsg,
                 ]);
             } else {
-                $this->error($validation);
+                $this->error($errorMsg);
             }
             exit(Command::FAILURE);
         }

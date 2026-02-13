@@ -202,7 +202,7 @@ enum PhpVersion: string
             $compatible = match (true) {
                 $frameworkVersion instanceof LaravelVersion => $case->isCompatibleWithLaravel($frameworkVersion),
                 $frameworkVersion instanceof SymfonyVersion => $case->isCompatibleWithSymfony($frameworkVersion),
-                $frameworkVersion instanceof MagentoVersion => $case->isCompatibleWithMagento($frameworkVersion),
+                default => $case->isCompatibleWithMagento($frameworkVersion),
             };
 
             if ($compatible) {
