@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpHive\Cli\Contracts;
 
+use PhpHive\Cli\Support\ConfigOperation;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -360,4 +361,54 @@ interface AppTypeInterface
      * @return array<string, string> Key-value pairs for stub replacement
      */
     public function getStubVariables(array $config): array;
+
+    /**
+     * Setup infrastructure (database, Redis, queues, etc.) after app is created.
+     *
+     * This method is called after the application framework is installed and
+     * prompts the user for infrastructure choices, then creates and configures
+     * the necessary services (Docker containers, configuration files, etc.).
+     *
+     * @param  string               $appName Application name
+     * @param  string               $appPath Full path to application directory
+     * @param  array<string, mixed> $options Infrastructure options (needsDatabase, needsCache, etc.)
+     * @return array<string, mixed> Infrastructure configuration
+     */
+    public function setupInfrastructure(string $appName, string $appPath, array $options = []): array;
+
+    /**
+     * Get configuration operations to be applied after installation.
+     *
+     * Returns an array of ConfigOperation objects that define what environment
+     * and configuration files need to be created or modified after the application
+     * is installed. This allows each AppType to declare its required configuration
+     * in a structured, testable way.
+     *
+     * Operations can include:
+     * - Setting environment variables in .env files
+     * - Appending additional configuration
+     * - Merging complex nested structures (for PHP config files)
+     *
+     * The operations are processed by a ConfigWriter service that handles
+     * different file formats (.env, PHP arrays, etc.) and action types.
+     *
+     * @return array<ConfigOperation> Array of configuration operations
+     *
+     * @example
+     * ```php
+     * public function getWritableConfig(): array
+     * {
+     *     return [
+     *         Config::set('.env', [
+     *             'DATABASE_HOST' => 'db',
+     *             'REDIS_HOST' => 'redis',
+     *         ]),
+     *         Config::merge('app/etc/env.php', [
+     *             'session' => ['save' => 'redis'],
+     *         ]),
+     *     ];
+     * }
+     * ```
+     */
+    public function getWritableConfig(): array;
 }
