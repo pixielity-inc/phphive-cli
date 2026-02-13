@@ -6,6 +6,7 @@ namespace PhpHive\Cli\Console\Commands\Make;
 
 use Exception;
 use PhpHive\Cli\Console\Commands\BaseCommand;
+use PhpHive\Cli\Support\Emitter;
 use PhpHive\Cli\Support\PreflightResult;
 
 use function sprintf;
@@ -56,46 +57,41 @@ use function sprintf;
  */
 abstract class BaseMakeCommand extends BaseCommand
 {
-    /**
-     * Workspace path being created (for cleanup on signal).
-     */
-    protected ?string $workspacePathForCleanup = null;
+    use Emitter;
 
     /**
-     * Whether workspace was created (for cleanup on signal).
+     * Whether signal handlers have been registered.
      */
-    protected bool $workspaceCreatedForCleanup = false;
-
-    /**
-     * Quiet mode flag (for cleanup on signal).
-     */
-    protected bool $isQuietMode = false;
-
-    /**
-     * JSON mode flag (for cleanup on signal).
-     */
-    protected bool $isJsonMode = false;
+    protected static bool $signalHandlersRegistered = false;
 
     /**
      * Register signal handlers for graceful cleanup on interruption.
      *
      * This method registers handlers for SIGINT (Ctrl+C) and SIGTERM signals
-     * to ensure proper cleanup when the user cancels the operation.
+     * that fire a 'cleanup' event. Commands can subscribe to this event to
+     * perform their own cleanup logic.
      *
      * The signal handler will:
-     * - Display a cancellation message
-     * - Call cleanupFailedWorkspace() if workspace was created
+     * - Fire the 'cleanup' event with quiet/json mode flags
      * - Exit with failure code
      *
-     * Example usage:
+     * Example usage in a command:
      * ```php
      * $this->registerSignalHandlers();
-     * $this->workspacePathForCleanup = $appPath;
-     * $this->workspaceCreatedForCleanup = true;
+     * $this->bindEvent('cleanup', function($isQuiet, $isJson) {
+     *     if ($this->appCreated && $this->appPath !== null) {
+     *         $this->cleanupFailedWorkspace($this->appPath, $isQuiet, $isJson);
+     *     }
+     * });
      * ```
      */
     protected function registerSignalHandlers(): void
     {
+        // Only register once globally
+        if (self::$signalHandlersRegistered) {
+            return;
+        }
+
         // Check if pcntl extension is available
         if (! function_exists('pcntl_signal')) {
             return;
@@ -108,49 +104,19 @@ abstract class BaseMakeCommand extends BaseCommand
 
         // Register SIGINT handler (Ctrl+C)
         pcntl_signal(SIGINT, function (): void {
-            if (! $this->isQuietMode && ! $this->isJsonMode) {
-                $this->line('');
-                $this->warning('Operation cancelled by user.');
-            }
-
-            // Cleanup if workspace was created
-            if ($this->workspaceCreatedForCleanup && $this->workspacePathForCleanup !== null) {
-                if (! $this->isQuietMode && ! $this->isJsonMode) {
-                    $this->warning('Cleaning up...');
-                }
-
-                $this->cleanupFailedWorkspace(
-                    $this->workspacePathForCleanup,
-                    $this->isQuietMode,
-                    $this->isJsonMode
-                );
-            }
-
+            // Fire cleanup event - subscribers will handle their own cleanup
+            $this->fireEvent('signal.interrupt');
             exit(1);
         });
 
         // Register SIGTERM handler
         pcntl_signal(SIGTERM, function (): void {
-            if (! $this->isQuietMode && ! $this->isJsonMode) {
-                $this->line('');
-                $this->warning('Operation terminated.');
-            }
-
-            // Cleanup if workspace was created
-            if ($this->workspaceCreatedForCleanup && $this->workspacePathForCleanup !== null) {
-                if (! $this->isQuietMode && ! $this->isJsonMode) {
-                    $this->warning('Cleaning up...');
-                }
-
-                $this->cleanupFailedWorkspace(
-                    $this->workspacePathForCleanup,
-                    $this->isQuietMode,
-                    $this->isJsonMode
-                );
-            }
-
+            // Fire cleanup event - subscribers will handle their own cleanup
+            $this->fireEvent('signal.terminate');
             exit(1);
         });
+
+        self::$signalHandlersRegistered = true;
     }
 
     /**

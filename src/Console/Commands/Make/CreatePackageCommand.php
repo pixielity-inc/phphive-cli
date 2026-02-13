@@ -206,16 +206,38 @@ final class CreatePackageCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
-        // Store mode flags for signal handler
-        $this->isQuietMode = $isQuiet;
-        $this->isJsonMode = $isJson;
-
-        // Register signal handlers for Ctrl+C cleanup
-        $this->registerSignalHandlers();
-
         // Track package path for cleanup on failure
         $packagePath = null;
         $packageCreated = false;
+
+        // Register signal handlers and subscribe to cleanup events
+        $this->registerSignalHandlers();
+        $this->bindEvent('signal.interrupt', function () use (&$packagePath, &$packageCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation cancelled by user.');
+            }
+
+            if ($packageCreated && $packagePath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($packagePath, $isQuiet, $isJson);
+            }
+        });
+        $this->bindEvent('signal.terminate', function () use (&$packagePath, &$packageCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation terminated.');
+            }
+
+            if ($packageCreated && $packagePath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($packagePath, $isQuiet, $isJson);
+            }
+        });
 
         try {
             // Display intro banner (skip in quiet/json mode)
@@ -277,10 +299,8 @@ final class CreatePackageCommand extends BaseMakeCommand
             $root = $this->getMonorepoRoot();
             $packagePath = "{$root}/packages/{$name}";
 
-            // Mark that package directory will be created and store for signal handler
+            // Mark that package directory will be created
             $packageCreated = true;
-            $this->workspacePathForCleanup = $packagePath;
-            $this->workspaceCreatedForCleanup = true;
 
             $steps = [
                 'Checking name availability' => fn (): bool => $this->checkNameAvailability($name, $packagePath),

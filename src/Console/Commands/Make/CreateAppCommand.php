@@ -378,16 +378,38 @@ final class CreateAppCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
-        // Store mode flags for signal handler
-        $this->isQuietMode = $isQuiet;
-        $this->isJsonMode = $isJson;
-
-        // Register signal handlers for Ctrl+C cleanup
-        $this->registerSignalHandlers();
-
         // Track app path for cleanup on failure
         $appPath = null;
         $appCreated = false;
+
+        // Register signal handlers and subscribe to cleanup events
+        $this->registerSignalHandlers();
+        $this->bindEvent('signal.interrupt', function () use (&$appPath, &$appCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation cancelled by user.');
+            }
+
+            if ($appCreated && $appPath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($appPath, $isQuiet, $isJson);
+            }
+        });
+        $this->bindEvent('signal.terminate', function () use (&$appPath, &$appCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation terminated.');
+            }
+
+            if ($appCreated && $appPath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($appPath, $isQuiet, $isJson);
+            }
+        });
 
         try {
             // Display intro banner (skip in quiet/json mode)
@@ -477,10 +499,8 @@ final class CreateAppCommand extends BaseMakeCommand
             $appsDir = "{$root}/apps";
             $filesystem = $this->filesystem();
 
-            // Mark that app directory will be created and store for signal handler
+            // Mark that app directory will be created
             $appCreated = true;
-            $this->workspacePathForCleanup = $appPath;
-            $this->workspaceCreatedForCleanup = true;
 
             $steps = [
                 'Installing application framework' => fn (): bool => $this->runInstallCommand($appType, $config, $appsDir, $isVerbose),

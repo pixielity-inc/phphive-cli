@@ -179,16 +179,38 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
         $isJson = $input->getOption('json') === true;
         $isVerbose = $input->getOption('verbose') === true;
 
-        // Store mode flags for signal handler
-        $this->isQuietMode = $isQuiet;
-        $this->isJsonMode = $isJson;
-
-        // Register signal handlers for Ctrl+C cleanup
-        $this->registerSignalHandlers();
-
         // Track workspace path for cleanup on failure
         $workspacePath = null;
         $workspaceCreated = false;
+
+        // Register signal handlers and subscribe to cleanup events
+        $this->registerSignalHandlers();
+        $this->bindEvent('signal.interrupt', function () use (&$workspacePath, &$workspaceCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation cancelled by user.');
+            }
+
+            if ($workspaceCreated && $workspacePath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($workspacePath, $isQuiet, $isJson);
+            }
+        });
+        $this->bindEvent('signal.terminate', function () use (&$workspacePath, &$workspaceCreated, $isQuiet, $isJson): void {
+            if (! $isQuiet && ! $isJson) {
+                $this->line('');
+                $this->warning('Operation terminated.');
+            }
+
+            if ($workspaceCreated && $workspacePath !== null) {
+                if (! $isQuiet && ! $isJson) {
+                    $this->warning('Cleaning up...');
+                }
+                $this->cleanupFailedWorkspace($workspacePath, $isQuiet, $isJson);
+            }
+        });
 
         try {
             // Display intro banner (skip in quiet/json mode)
@@ -212,11 +234,9 @@ final class MakeWorkspaceCommand extends BaseMakeCommand
             // Step 2: Get and validate workspace name
             $name = $this->getValidatedWorkspaceName($input, $isQuiet, $isJson);
 
-            // Track workspace path for cleanup and store for signal handler
+            // Track workspace path for cleanup
             $workspacePath = getcwd() . "/{$name}";
             $workspaceCreated = true;
-            $this->workspacePathForCleanup = $workspacePath;
-            $this->workspaceCreatedForCleanup = true;
 
             // Step 3: Execute workspace creation with progress feedback
             $steps = [
