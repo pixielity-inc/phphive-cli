@@ -13,10 +13,14 @@ use const PHP_SAPI;
 use PhpHive\Cli\Concerns\ChecksForUpdates;
 use PhpHive\Cli\Concerns\HasDiscovery;
 use PhpHive\Cli\Concerns\InteractsWithPrompts;
+use PhpHive\Cli\Factories\AppTypeFactory;
+use PhpHive\Cli\Factories\PackageTypeFactory;
+use PhpHive\Cli\Services\NameSuggestionService;
 use PhpHive\Cli\Support\Composer;
 use PhpHive\Cli\Support\Container;
 use PhpHive\Cli\Support\Docker;
 use PhpHive\Cli\Support\Filesystem;
+use PhpHive\Cli\Support\PreflightChecker;
 use PhpHive\Cli\Support\Process;
 use PhpHive\Cli\Support\Reflection;
 
@@ -26,7 +30,9 @@ use Symfony\Component\Console\Application as BaseApplication;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\CommandNotFoundException;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Finder\Finder;
 
 /**
  * CLI Application.
@@ -156,7 +162,7 @@ final class Application extends BaseApplication
         // Auto-discover and register all commands in the Commands directory
         $this->discoverCommands(
             __DIR__ . '/Console/Commands',
-            'PhpHive\\Cli\\Console\\Commands',
+            'PhpHive\Cli\Console\Commands',
         );
 
         // Mark as booted to prevent duplicate registration
@@ -182,6 +188,14 @@ final class Application extends BaseApplication
         if (! $this->booted) {
             $this->boot();
         }
+
+        // Create output interface if not provided
+        if (! $output instanceof OutputInterface) {
+            $output = new ConsoleOutput();
+        }
+
+        // Set output for prompt methods
+        self::setOutput($output);
 
         // Display ASCII art banner (once per process)
         $this->displayBanner();
@@ -308,6 +322,120 @@ final class Application extends BaseApplication
     }
 
     /**
+     * Register core services in the dependency injection container.
+     *
+     * This method registers all core application services as singletons
+     * in the container. Services registered here are available to all
+     * commands via dependency injection.
+     *
+     * Service Categories:
+     *
+     * Core Services:
+     * - Filesystem: File and directory operations
+     * - Process: Shell command execution with Symfony Process
+     * - Reflection: PHP reflection utilities
+     *
+     * Development Tools:
+     * - Composer: Composer dependency management operations
+     * - Docker: Docker and Docker Compose container operations
+     *
+     * Utilities:
+     * - Finder: Symfony Finder for file/directory discovery
+     * - PreflightChecker: Environment validation before operations
+     * - NameSuggestionService: Name suggestion when conflicts occur
+     *
+     * Factories:
+     * - AppTypeFactory: Creates application type instances
+     * - PackageTypeFactory: Creates package type instances
+     *
+     * All services are registered as singletons to ensure a single instance
+     * is shared across the application lifecycle, improving performance and
+     * maintaining consistent state.
+     */
+    private function registerServices(): void
+    {
+        // =====================================================================
+        // CORE SERVICES
+        // =====================================================================
+
+        // Filesystem service for file and directory operations
+        $this->container->singleton(
+            Filesystem::class,
+            Filesystem::make(...)
+        );
+
+        // Process service for executing shell commands
+        $this->container->singleton(
+            Process::class,
+            Process::make(...)
+        );
+
+        // Reflection utilities for PHP introspection
+        $this->container->singleton(
+            Reflection::class,
+            fn (): Reflection => new Reflection()
+        );
+
+        // =====================================================================
+        // DEVELOPMENT TOOLS
+        // =====================================================================
+
+        // Composer service for dependency management
+        $this->container->singleton(
+            Composer::class,
+            Composer::make(...)
+        );
+
+        // Docker service for container operations
+        $this->container->singleton(
+            Docker::class,
+            Docker::make(...)
+        );
+
+        // =====================================================================
+        // UTILITIES
+        // =====================================================================
+
+        // Symfony Finder for file/directory discovery
+        $this->container->singleton(
+            Finder::class,
+            fn (): Finder => new Finder()
+        );
+
+        // Preflight checker for environment validation
+        $this->container->singleton(
+            PreflightChecker::class,
+            fn (Container $c): PreflightChecker => PreflightChecker::make(
+                $c->make(Process::class)
+            )
+        );
+
+        // Name suggestion service for conflict resolution
+        $this->container->singleton(
+            NameSuggestionService::class,
+            NameSuggestionService::make(...)
+        );
+
+        // =====================================================================
+        // FACTORIES
+        // =====================================================================
+
+        // App type factory for creating application instances
+        $this->container->singleton(
+            AppTypeFactory::class,
+            fn (): AppTypeFactory => new AppTypeFactory()
+        );
+
+        // Package type factory for creating package instances
+        $this->container->singleton(
+            PackageTypeFactory::class,
+            fn (Container $c): PackageTypeFactory => new PackageTypeFactory(
+                $c->make(Composer::class)
+            )
+        );
+    }
+
+    /**
      * Find command alternatives based on user input.
      *
      * This method enhances Symfony Console's default command suggestion by:
@@ -365,37 +493,6 @@ final class Application extends BaseApplication
     }
 
     /**
-     * Register core services in the dependency injection container.
-     *
-     * This method registers all core application services as singletons
-     * in the container. Services registered here are available to all
-     * commands via dependency injection.
-     *
-     * Registered services:
-     * - Filesystem: File and directory operations
-     * - Process: Shell command execution with Symfony Process
-     * - Composer: Composer dependency management operations
-     * - Docker: Docker and Docker Compose container operations
-     *
-     * All services are registered as singletons to ensure a single instance
-     * is shared across the application lifecycle.
-     */
-    private function registerServices(): void
-    {
-        // Register Filesystem as singleton
-        $this->container->singleton(Filesystem::class, fn (): Filesystem => Filesystem::make());
-
-        // Register Process as singleton
-        $this->container->singleton(Process::class, fn (): Process => Process::make());
-
-        // Register Composer as singleton
-        $this->container->singleton(Composer::class, fn (): Composer => Composer::make());
-
-        // Register Docker as singleton
-        $this->container->singleton(Docker::class, fn (): Docker => Docker::make());
-    }
-
-    /**
      * Display the application ASCII art banner.
      *
      * Shows a colorful ASCII art banner with the application name and version.
@@ -444,12 +541,12 @@ final class Application extends BaseApplication
 
         // Honey-themed gradients inspired by #F39C12 (Honey Gold)
         $gradients = [
-            'Honey' => [214, 208, 202, 178, 172, 136],           // Warm honey gradient
-            'Amber' => [220, 214, 208, 202, 178, 172],           // Amber honey
-            'Golden' => [226, 220, 214, 208, 202, 178],          // Golden honey
-            'Sunset' => [214, 208, 202, 196, 160, 124],          // Sunset honey
-            'Caramel' => [180, 174, 168, 162, 136, 130],         // Caramel honey
-            'Wildflower' => [221, 215, 209, 203, 179, 173],      // Wildflower honey
+            'Honey' => [214, 208, 202, 178, 172, 136],  // Warm honey gradient
+            'Amber' => [220, 214, 208, 202, 178, 172],  // Amber honey
+            'Golden' => [226, 220, 214, 208, 202, 178],  // Golden honey
+            'Sunset' => [214, 208, 202, 196, 160, 124],  // Sunset honey
+            'Caramel' => [180, 174, 168, 162, 136, 130],  // Caramel honey
+            'Wildflower' => [221, 215, 209, 203, 179, 173],  // Wildflower honey
         ];
 
         // Randomly select a gradient theme
