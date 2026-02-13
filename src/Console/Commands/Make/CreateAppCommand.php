@@ -434,18 +434,42 @@ final class CreateAppCommand extends BaseMakeCommand
     }
 
     /**
-     * Setup cleanup handlers for signal interruption.
+     * Setup cleanup handlers for signal interruption (Ctrl+C, SIGTERM).
+     *
+     * This method registers signal handlers using the Emitter pattern to ensure
+     * proper cleanup when the user cancels the operation or the process is terminated.
+     * It subscribes to two events:
+     * - signal.interrupt: Triggered when user presses Ctrl+C (SIGINT)
+     * - signal.terminate: Triggered when process receives SIGTERM
+     *
+     * Both handlers perform the same cleanup logic:
+     * 1. Display cancellation/termination message (unless in quiet/json mode)
+     * 2. Check if app directory was created
+     * 3. Call cleanupFailedWorkspace() to remove Docker containers and directories
+     *
+     * The handlers use closure variable references (&$appPath, &$appCreated) to access
+     * the current state of the creation process, allowing them to determine if cleanup
+     * is necessary.
+     *
+     * @param string|null &$appPath    Reference to app path (updated during creation)
+     * @param bool        &$appCreated Reference to creation flag (set to true when app dir is created)
+     * @param bool        $isQuiet     Suppress output messages
+     * @param bool        $isJson      Output in JSON format
      */
     private function setupCleanupHandlers(?string &$appPath, bool &$appCreated, bool $isQuiet, bool $isJson): void
     {
+        // Register global signal handlers (SIGINT, SIGTERM)
         $this->registerSignalHandlers();
 
+        // Subscribe to SIGINT event (Ctrl+C)
         $this->bindEvent('signal.interrupt', function () use (&$appPath, &$appCreated, $isQuiet, $isJson): void {
+            // Display cancellation message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Operation cancelled by user.');
             }
 
+            // Cleanup if app directory was created
             if ($appCreated && $appPath !== null) {
                 if (! $isQuiet && ! $isJson) {
                     $this->warning('Cleaning up...');
@@ -454,12 +478,15 @@ final class CreateAppCommand extends BaseMakeCommand
             }
         });
 
+        // Subscribe to SIGTERM event (process termination)
         $this->bindEvent('signal.terminate', function () use (&$appPath, &$appCreated, $isQuiet, $isJson): void {
+            // Display termination message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Operation terminated.');
             }
 
+            // Cleanup if app directory was created
             if ($appCreated && $appPath !== null) {
                 if (! $isQuiet && ! $isJson) {
                     $this->warning('Cleaning up...');
@@ -470,10 +497,21 @@ final class CreateAppCommand extends BaseMakeCommand
     }
 
     /**
-     * Display intro banner.
+     * Display intro banner and environment check message.
+     *
+     * Shows a welcoming banner with the command title and indicates that
+     * environment checks are being performed. This provides visual feedback
+     * to the user that the command has started and is validating the system.
+     *
+     * Output is suppressed in quiet mode (for CI/CD) and JSON mode (for
+     * programmatic usage).
+     *
+     * @param bool $isQuiet Suppress all output
+     * @param bool $isJson  Output in JSON format
      */
     private function displayIntro(bool $isQuiet, bool $isJson): void
     {
+        // Skip intro in quiet/json mode
         if (! $isQuiet && ! $isJson) {
             $this->intro('Application Creation');
             $this->info('Running environment checks...');
@@ -482,17 +520,34 @@ final class CreateAppCommand extends BaseMakeCommand
 
     /**
      * Check environment with preflight checks.
+     *
+     * Validates that the development environment meets all requirements for
+     * creating an application. This includes checking for:
+     * - Required tools (PHP, Composer, Git, Node.js, pnpm)
+     * - Correct versions of dependencies
+     * - Proper system configuration
+     * - Available disk space
+     *
+     * If any checks fail, error messages are displayed and the method returns
+     * false to halt the creation process.
+     *
+     * @param  bool $isQuiet Suppress output messages
+     * @param  bool $isJson  Output in JSON format
+     * @return bool True if all checks passed, false otherwise
      */
     private function checkEnvironment(bool $isQuiet, bool $isJson): bool
     {
+        // Run all preflight checks
         $preflightResult = $this->runPreflightChecks($isQuiet, $isJson);
 
+        // Display errors if any checks failed
         if ($preflightResult->failed()) {
             $this->displayPreflightErrors($preflightResult, $isQuiet, $isJson);
 
             return false;
         }
 
+        // Add spacing after checks (visual separation)
         if (! $isQuiet && ! $isJson) {
             $this->line('');
         }
@@ -502,11 +557,29 @@ final class CreateAppCommand extends BaseMakeCommand
 
     /**
      * Select and validate app type.
+     *
+     * Determines which application type to create (Laravel, Symfony, Magento, Skeleton).
+     * The app type can be provided via the --type option or selected interactively.
+     *
+     * Process:
+     * 1. Check if --type option was provided
+     * 2. If provided, validate it against available types
+     * 3. If not provided, prompt user to select from available types
+     * 4. Create and return the app type instance
+     *
+     * If validation fails (invalid type provided), error messages are displayed
+     * and null is returned to halt the creation process.
+     *
+     * @param  InputInterface        $input   Command input (for reading --type option)
+     * @param  bool                  $isQuiet Suppress output messages
+     * @param  bool                  $isJson  Output in JSON format
+     * @return AppTypeInterface|null App type instance, or null if validation failed
      */
     private function selectAppType(InputInterface $input, bool $isQuiet, bool $isJson): ?AppTypeInterface
     {
         $typeOption = $input->getOption('type');
 
+        // Check if type was provided via option
         if ($typeOption !== null && $typeOption !== '') {
             // Validate the provided app type
             if (! $this->appTypeFactory()->isValid($typeOption)) {
@@ -526,20 +599,44 @@ final class CreateAppCommand extends BaseMakeCommand
             }
             $appTypeId = $typeOption;
         } else {
-            // Prompt user to select app type
+            // Prompt user to select app type interactively
             $appTypeId = $this->select(
                 label: 'Select application type',
                 options: AppTypeFactory::choices()
             );
         }
 
+        // Create and return the app type instance
         return $this->appTypeFactory()->create($appTypeId);
     }
 
     /**
      * Collect application configuration.
      *
-     * @return array<string, mixed>
+     * Gathers all configuration needed to create the application by prompting
+     * the user for app-type-specific settings. Each app type (Laravel, Symfony,
+     * Magento, Skeleton) has its own configuration requirements.
+     *
+     * Process:
+     * 1. Display selected app type name
+     * 2. Set app name in input (so app type doesn't prompt for it again)
+     * 3. Set description in input if provided via --description option
+     * 4. Call app type's collectConfiguration() method to gather settings
+     * 5. Ensure name and description are set in final config
+     *
+     * Configuration examples:
+     * - Laravel: PHP version, starter kit (Breeze/Jetstream), Sanctum, Octane
+     * - Symfony: PHP version, project type (webapp/api), Maker, Security, Doctrine
+     * - Magento: Edition, version, marketplace credentials, admin settings
+     * - Skeleton: PHP version, quality tools (PHPUnit, PHPStan, Pint)
+     *
+     * @param  InputInterface       $input   Command input (for reading options)
+     * @param  OutputInterface      $output  Command output (for displaying prompts)
+     * @param  string               $name    Application name
+     * @param  AppTypeInterface     $appType App type instance
+     * @param  bool                 $isQuiet Suppress output messages
+     * @param  bool                 $isJson  Output in JSON format
+     * @return array<string, mixed> Configuration array with all settings
      */
     private function collectAppConfiguration(
         InputInterface $input,
@@ -549,6 +646,7 @@ final class CreateAppCommand extends BaseMakeCommand
         bool $isQuiet,
         bool $isJson
     ): array {
+        // Display selected app type
         if (! $isQuiet && ! $isJson) {
             $this->comment("Selected: {$appType->getName()}");
             $this->line('');
@@ -556,6 +654,7 @@ final class CreateAppCommand extends BaseMakeCommand
         }
 
         // Set name in input so app types don't prompt for it
+        // (they should read from input argument if available)
         $input->setArgument('name', $name);
 
         // Set description in input if provided via option
@@ -564,6 +663,7 @@ final class CreateAppCommand extends BaseMakeCommand
             $input->setOption('description', $descriptionOption);
         }
 
+        // Collect app-type-specific configuration
         $config = $appType->collectConfiguration($input, $output);
 
         // Ensure name is set from command argument (override any prompts)
@@ -582,7 +682,47 @@ final class CreateAppCommand extends BaseMakeCommand
     /**
      * Execute creation steps with progress feedback.
      *
-     * @param  array<string, mixed> $config
+     * Orchestrates the main application creation workflow by executing a series
+     * of steps in sequence. Each step is a closure that performs a specific task
+     * and returns a boolean indicating success/failure.
+     *
+     * Creation steps:
+     * 1. Installing application framework
+     *    - Runs composer create-project or equivalent command
+     *    - Creates the base application structure
+     *    - Installs framework dependencies
+     *
+     * 2. Setting up infrastructure
+     *    - Configures database (MySQL, PostgreSQL, SQLite, MariaDB)
+     *    - Sets up caching (Redis, Memcached)
+     *    - Configures queues (Redis, Database, Sync)
+     *    - Sets up search engines (Elasticsearch, Meilisearch)
+     *    - Configures storage (MinIO, S3)
+     *    - Creates Docker containers if needed
+     *
+     * 3. Processing configuration files
+     *    - Copies stub template files
+     *    - Replaces placeholders with actual values
+     *    - Generates app-specific configuration
+     *
+     * 4. Running additional setup tasks
+     *    - Runs database migrations
+     *    - Compiles assets
+     *    - Generates application keys
+     *    - Performs app-type-specific setup
+     *
+     * Progress feedback:
+     * - In normal mode: Shows spinner with step message
+     * - In quiet/json mode: Executes silently
+     * - In verbose mode: Shows step duration
+     *
+     * @param  AppTypeInterface     $appType   App type instance
+     * @param  array<string, mixed> $config    Configuration array
+     * @param  string               $name      Application name
+     * @param  string               $appPath   Full path to app directory
+     * @param  bool                 $isQuiet   Suppress output messages
+     * @param  bool                 $isJson    Output in JSON format
+     * @param  bool                 $isVerbose Show detailed output
      * @return float                Total duration in seconds
      */
     private function executeCreationSteps(
@@ -594,10 +734,12 @@ final class CreateAppCommand extends BaseMakeCommand
         bool $isJson,
         bool $isVerbose
     ): float {
+        // Get monorepo paths
         $root = $this->getMonorepoRoot();
         $appsDir = "{$root}/apps";
         $filesystem = $this->filesystem();
 
+        // Define creation steps as closures
         $steps = [
             'Installing application framework' => fn (): bool => $this->runInstallCommand($appType, $config, $appsDir, $isVerbose),
             'Setting up infrastructure' => fn (): bool => $this->setupInfrastructure($appType, $appPath, $name, $isVerbose),
@@ -605,12 +747,15 @@ final class CreateAppCommand extends BaseMakeCommand
             'Running additional setup tasks' => fn (): bool => $this->runPostInstallCommands($appType, $config, $appPath, $isVerbose),
         ];
 
+        // Add spacing before steps
         if (! $isQuiet && ! $isJson) {
             $this->line('');
         }
 
+        // Track total duration
         $startTime = microtime(true);
 
+        // Execute each step in sequence
         foreach ($steps as $message => $step) {
             $this->executeStep($step, $message, $name, $appType, $isQuiet, $isJson, $isVerbose);
         }
@@ -620,6 +765,36 @@ final class CreateAppCommand extends BaseMakeCommand
 
     /**
      * Execute a single creation step.
+     *
+     * Runs a single step in the creation workflow and provides progress feedback.
+     * The step is executed as a closure that returns a boolean indicating success.
+     *
+     * Execution flow:
+     * 1. Record start time for duration tracking
+     * 2. Execute step (with or without spinner based on mode)
+     * 3. Check result - throw exception if step failed
+     * 4. Calculate step duration
+     * 5. Display completion message with optional duration
+     *
+     * Progress feedback modes:
+     * - Normal mode: Shows spinner during execution, completion message after
+     * - Quiet/JSON mode: Executes silently, no output
+     * - Verbose mode: Shows completion message with duration
+     *
+     * Error handling:
+     * - If step returns false, throws Exception with step message
+     * - Exception is caught by execute() method's try-catch block
+     * - Triggers cleanup and displays error message
+     *
+     * @param callable         $step      Step closure to execute
+     * @param string           $message   Step description for display
+     * @param string           $name      Application name (for error messages)
+     * @param AppTypeInterface $appType   App type (for error messages)
+     * @param bool             $isQuiet   Suppress output messages
+     * @param bool             $isJson    Output in JSON format
+     * @param bool             $isVerbose Show detailed output
+     *
+     * @throws Exception If step fails (returns false)
      */
     private function executeStep(
         callable $step,
@@ -630,15 +805,21 @@ final class CreateAppCommand extends BaseMakeCommand
         bool $isJson,
         bool $isVerbose
     ): void {
+        // Track step duration
         $stepStartTime = microtime(true);
 
+        // Execute step (with or without spinner)
         if ($isQuiet || $isJson) {
+            // Silent execution for CI/CD and programmatic usage
             $result = $step();
         } else {
+            // Show spinner during execution
             $result = $this->spin($step, "{$message}...");
         }
 
+        // Check if step failed
         if ($result === false) {
+            // Output error in JSON format if requested
             if ($isJson) {
                 $this->outputJson([
                     'success' => false,
@@ -648,20 +829,52 @@ final class CreateAppCommand extends BaseMakeCommand
                 ]);
             }
 
+            // Throw exception to trigger cleanup
             throw new Exception("Failed: {$message}");
         }
 
+        // Calculate step duration
         $stepDuration = microtime(true) - $stepStartTime;
 
+        // Display completion message
         if (! $isQuiet && ! $isJson) {
             $this->comment("✓ {$message} complete");
         } elseif ($isVerbose && ! $isJson) {
+            // Show duration in verbose mode
             $this->comment(sprintf('✓ %s complete (%.2fs)', $message, $stepDuration));
         }
     }
 
     /**
      * Handle command failure.
+     *
+     * Handles exceptions that occur during application creation by performing
+     * cleanup and displaying appropriate error messages.
+     *
+     * Cleanup process:
+     * 1. Check if app directory was created
+     * 2. Display cleanup message (unless in quiet/json mode)
+     * 3. Call cleanupFailedWorkspace() to:
+     *    - Stop and remove Docker containers (docker compose down -v)
+     *    - Remove Docker volumes
+     *    - Delete the app directory
+     *
+     * Error message display:
+     * - JSON mode: Outputs structured error with success=false
+     * - Normal mode: Displays error message with exception details
+     *
+     * This method is called from the execute() method's catch block when any
+     * exception occurs during the creation process, including:
+     * - Step failures (from executeStep throwing Exception)
+     * - User cancellation (Ctrl+C via signal handlers)
+     * - Unexpected errors (database connection, file system, etc.)
+     *
+     * @param  Exception   $exception  The exception that caused the failure
+     * @param  string|null $appPath    Path to app directory (null if not created yet)
+     * @param  bool        $appCreated Whether app directory was created
+     * @param  bool        $isQuiet    Suppress output messages
+     * @param  bool        $isJson     Output in JSON format
+     * @return int         Command::FAILURE exit code
      */
     private function handleFailure(
         Exception $exception,
@@ -672,21 +885,25 @@ final class CreateAppCommand extends BaseMakeCommand
     ): int {
         // Cleanup on failure or cancellation
         if ($appCreated && $appPath !== null) {
+            // Display cleanup message
             if (! $isQuiet && ! $isJson) {
                 $this->line('');
                 $this->warning('Cleaning up failed application...');
             }
 
+            // Remove Docker containers, volumes, and app directory
             $this->cleanupFailedWorkspace($appPath, $isQuiet, $isJson);
         }
 
         // Display error message
         if ($isJson) {
+            // Structured error output for programmatic usage
             $this->outputJson([
                 'success' => false,
                 'error' => $exception->getMessage(),
             ]);
         } else {
+            // Human-readable error message
             $this->error('Application creation failed: ' . $exception->getMessage());
         }
 
