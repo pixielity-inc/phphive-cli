@@ -725,11 +725,12 @@ trait InteractsWithDatabase
         }
 
         // Multiple database types supported, build selection menu
-        // Format: "Name (Description)" => value
+        // Format: value => "Name (Description)"
         $dbTypeOptions = [];
         foreach ($supportedDatabases as $supportedDatabase) {
-            // Create user-friendly option label with name and description
-            $dbTypeOptions[$supportedDatabase->getName() . ' (' . $supportedDatabase->getDescription() . ')'] = $supportedDatabase->value;
+            // Use enum value as key, user-friendly label as value
+            // This ensures select() returns the enum value, not the label
+            $dbTypeOptions[$supportedDatabase->value] = $supportedDatabase->getName() . ' (' . $supportedDatabase->getDescription() . ')';
         }
 
         // Present interactive selection menu to user
