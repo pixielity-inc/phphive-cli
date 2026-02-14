@@ -128,7 +128,7 @@ final class InfoCommand extends BaseCommand
             )
             ->addOption(
                 'format',
-                'f',
+                null,
                 InputOption::VALUE_REQUIRED,
                 'Output format: text (default), json, table',
                 'text',

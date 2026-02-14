@@ -1,0 +1,49 @@
+PHPUnit 11.5.53 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.17 with PCOV 1.0.12
+Configuration: /Users/akouta/Projects/mono-php/cli/phpunit.xml
+Random Seed:   1771028239
+
+..............................E..EEEEEE..E.EE.EE.E.............  63 / 750 (  8%)
+..........................................EEEEEEEEEEEEEEEEEEEEE 126 / 750 ( 16%)
+EEEEE.........................................E.EEEE..E..EEEEEE 189 / 750 ( 25%)
+EEE.EE................E.E....EEEE.E..EE..E...E................. 252 / 750 ( 33%)
+...................................E.EE.E.E..E..E...EEEEEE..... 315 / 750 ( 42%)
+...................................................EEE.E.EEE..E 378 / 750 ( 50%)
+.EEE..E.EE.EE.EE..EEEEEEE.EE.EEEEE.EEEE..EE.EEE....E..EEEE..EEE 441 / 750 ( 58%)
+EEE.EEEEEE.E.EEE..E.E..EEEEE.EEE.E............................. 504 / 750 ( 67%)
+..........Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+................EEE
+[32m ✓ Application name 'test' is available[39m
+
+.E[33m Application 'test' already exists[39m
+
+...EEEEE....E.E..E.E 567 / 750 ( 75%)
+E.E.EE..EE..........................................E.EE.E.EE.E 630 / 750 ( 84%)
+EEE..EE.Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+...Failed to register command PhpHive\Cli\Console\Commands\Workspace\InfoCommand: An option with shortcut "f" already exists.
+
+
+[H[J
+[38;5;220m██████╗ ██╗  ██╗██████╗ ██╗  ██╗██╗██╗   ██╗███████╗[0m
+[38;5;214m██╔══██╗██║  ██║██╔══██╗██║  ██║██║██║   ██║██╔════╝[0m
+[38;5;208m██████╔╝███████║██████╔╝███████║██║██║   ██║█████╗  [0m
+[38;5;202m██╔═══╝ ██╔══██║██╔═══╝ ██╔══██║██║╚██╗ ██╔╝██╔══╝  [0m
+[38;5;178m██║     ██║  ██║██║     ██║  ██║██║ ╚████╔╝ ███████╗[0m
+[38;5;172m╚═╝     ╚═╝  ╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝  ╚══════╝[0m
+
+[38;5;214mPHP Monorepo Management powered by Turborepo[0m [90mv1.0.21[0m
+
