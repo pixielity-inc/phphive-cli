@@ -99,7 +99,7 @@ jobs:
       # Checkout Code
       # ----------------------------------------------------------------------
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Fetch full history for better error messages
           fetch-depth: 0
@@ -129,7 +129,7 @@ jobs:
       # Cache Composer Dependencies
       # ----------------------------------------------------------------------
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: ${{ runner.os }}-php-${{ matrix.php }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -165,7 +165,7 @@ jobs:
       # ----------------------------------------------------------------------
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-php-${{ matrix.php }}-${{ matrix.dependencies }}
           path: var/log/
@@ -184,7 +184,7 @@ jobs:
       # Checkout Code
       # ----------------------------------------------------------------------
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -213,7 +213,7 @@ jobs:
       # Cache Composer Dependencies
       # ----------------------------------------------------------------------
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: vendor
           key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('**/composer.lock') }}
@@ -250,7 +250,7 @@ jobs:
       # ----------------------------------------------------------------------
       - name: Upload quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: quality-reports
           path: build/
@@ -269,7 +269,7 @@ jobs:
       # Checkout Code
       # ----------------------------------------------------------------------
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # ----------------------------------------------------------------------
       # Setup PHP Environment
