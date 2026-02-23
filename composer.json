@@ -41,7 +41,7 @@
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/extension-installer": "^1.4",
         "laravel/pint": "^1.18",
-        "rector/rector": "^2.0",
+        "rector/rector": "^2.3",
         "phpunit/phpunit": "^11.5",
         "mockery/mockery": "^1.6",
         "infection/infection": "^0.32"
